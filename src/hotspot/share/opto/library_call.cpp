@@ -2553,7 +2553,7 @@ bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, c
     }
 
     RegionNode* region = new RegionNode(3);
-    region->init_req(1, if_true);
+    region->init_req(1, control());
     region->init_req(2, if_false);
 
     set_control(_gvn.transform(region));

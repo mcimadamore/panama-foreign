@@ -26,6 +26,7 @@
 
 package jdk.internal.foreign;
 
+import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.ForceInline;
 
 import java.lang.invoke.MethodHandles;
@@ -95,12 +96,15 @@ abstract class MemoryScope {
     }
 
     private final Thread owner;
-    private boolean closed; // = false
-    private static final VarHandle CLOSED;
+    private boolean isAlive = true;
+    private static final VarHandle IS_ALIVE;
+    private static final Unsafe U = Unsafe.getUnsafe();
+
+    static final long IS_ALIVE_OFFSET = Unsafe.getUnsafe().objectFieldOffset(MemoryScope.class, "isAlive");
 
     static {
         try {
-            CLOSED = MethodHandles.lookup().findVarHandle(MemoryScope.class, "closed", boolean.class);
+            IS_ALIVE = MethodHandles.lookup().findVarHandle(MemoryScope.class, "isAlive", boolean.class);
         } catch (Throwable ex) {
             throw new ExceptionInInitializerError(ex);
         }
@@ -173,7 +177,7 @@ abstract class MemoryScope {
      * @return {@code true} if this scope is not closed yet.
      */
     final boolean isAlive() {
-        return !((boolean)CLOSED.getVolatile(this));
+        return ((boolean) IS_ALIVE.getVolatile(this));
     }
 
     /**
@@ -200,7 +204,7 @@ abstract class MemoryScope {
      */
     @ForceInline
     private static void checkAliveConfined(MemoryScope scope) {
-        if (scope.closed) {
+        if (!scope.isAlive) {
             throw new IllegalStateException("This scope is already closed");
         }
     }
@@ -272,7 +276,8 @@ abstract class MemoryScope {
                     throw new IllegalStateException("Cannot close this scope as it has active acquired children");
                 }
                 // now that we made sure there's no active acquired children, we can mark scope as closed
-                CLOSED.set(this, true); // plain write is enough here (full write lock)
+                //U.synchronizeThreads();
+                IS_ALIVE.set(this, false); // plain write is enough here (full write lock)
             } finally {
                 // leave critical section
                 lock.unlockWrite(stamp);
@@ -295,14 +300,14 @@ abstract class MemoryScope {
                 checkValidState(); // child scope is always checked
                 // pre-allocate duped scope so we don't get OOME later and be left with this scope closed
                 var duped = new Child(newOwner);
-                CLOSED.setVolatile(this, true);
+                IS_ALIVE.setVolatile(this, false);
                 return duped;
             }
 
             @Override
             void close() {
                 checkValidState(); // child scope is always checked
-                CLOSED.set(this, true);
+                IS_ALIVE.set(this, false);
                 // following acts as a volatile write after plain write above so
                 // plain write gets flushed too (which is important for isAliveThreadSafe())
                 Root.this.acquired.decrement();

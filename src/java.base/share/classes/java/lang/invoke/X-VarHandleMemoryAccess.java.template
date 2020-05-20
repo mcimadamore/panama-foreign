@@ -91,7 +91,28 @@ final class MemoryAccessVarHandle$Type$Helper {
         }
         return address;
     }
-    
+
+#if[int]
+    @ForceInline
+    static $type$ get0(VarHandle ob, Object obb, long base) {
+        MemoryAccessVarHandleBase handle = (MemoryAccessVarHandleBase)ob;
+        MemoryAddressProxy bb = checkAddress(obb, base, handle.length, true);
+        Object accessBase = bb.unsafeGetBase();
+        long accessOffset = offsetNoVMAlignCheck(bb, base, handle.alignmentMask);
+        Object checkBase = bb.checkBase();
+        long checkOffset = bb.checkOffset();
+        try {
+            int res = UNSAFE.getIntChecked(
+                    accessBase,
+                    accessOffset,
+                    checkBase,
+                    checkOffset);
+            return convEndian(handle.be, res);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalStateException("This scope is already closed");
+        }
+    }
+#else[int]
     @ForceInline
     static $type$ get0(VarHandle ob, Object obb, long base) {
         MemoryAccessVarHandleBase handle = (MemoryAccessVarHandleBase)ob;
@@ -115,6 +136,7 @@ final class MemoryAccessVarHandle$Type$Helper {
 #end[byte]
 #end[floatingPoint]
     }
+#end[int]
 
     @ForceInline
     static void set0(VarHandle ob, Object obb, long base, $type$ value) {

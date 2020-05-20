@@ -108,6 +108,16 @@ public final class MemoryAddressImpl implements MemoryAddress, MemoryAddressProx
     }
 
     @Override
+    public Object checkBase() {
+        return segment.scope;
+    }
+
+    @Override
+    public long checkOffset() {
+        return MemoryScope.IS_ALIVE_OFFSET;
+    }
+
+    @Override
     public boolean isSmall() {
         return segment.isSmall();
     }

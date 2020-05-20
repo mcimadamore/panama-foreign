@@ -39,6 +39,9 @@ public interface MemoryAddressProxy {
     void checkAccess(long offset, long length, boolean readOnly);
     long unsafeGetOffset();
     Object unsafeGetBase();
+
+    long checkOffset();
+    Object checkBase();
     boolean isSmall();
 
     /* Helper functions for offset computations. These are required so that we can avoid issuing long opcodes
