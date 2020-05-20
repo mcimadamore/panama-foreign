@@ -153,33 +153,33 @@ public class ParallelSum {
         return res;
     };
 
-    @Benchmark
-    public Optional<MemorySegment> segment_stream_findany_serial() {
-        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT), false)
-                .filter(FIND_SINGLE)
-                .findAny();
-    }
-
-    @Benchmark
-    public Optional<MemorySegment> segment_stream_findany_parallel() {
-        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT), true)
-                .filter(FIND_SINGLE)
-                .findAny();
-    }
-
-    @Benchmark
-    public Optional<MemorySegment> segment_stream_findany_serial_bulk() {
-        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT_BULK), false)
-                .filter(FIND_BULK)
-                .findAny();
-    }
-
-    @Benchmark
-    public Optional<MemorySegment> segment_stream_findany_parallel_bulk() {
-        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT_BULK), true)
-                .filter(FIND_BULK)
-                .findAny();
-    }
+//    @Benchmark
+//    public Optional<MemorySegment> segment_stream_findany_serial() {
+//        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT), false)
+//                .filter(FIND_SINGLE)
+//                .findAny();
+//    }
+//
+//    @Benchmark
+//    public Optional<MemorySegment> segment_stream_findany_parallel() {
+//        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT), true)
+//                .filter(FIND_SINGLE)
+//                .findAny();
+//    }
+//
+//    @Benchmark
+//    public Optional<MemorySegment> segment_stream_findany_serial_bulk() {
+//        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT_BULK), false)
+//                .filter(FIND_BULK)
+//                .findAny();
+//    }
+//
+//    @Benchmark
+//    public Optional<MemorySegment> segment_stream_findany_parallel_bulk() {
+//        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT_BULK), true)
+//                .filter(FIND_BULK)
+//                .findAny();
+//    }
 
     final static Predicate<MemorySegment> FIND_SINGLE = slice ->
             (int)VH_int.get(slice.baseAddress(), 0L) == (ELEM_SIZE - 1);
