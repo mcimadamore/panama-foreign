@@ -276,8 +276,8 @@ abstract class MemoryScope {
                     throw new IllegalStateException("Cannot close this scope as it has active acquired children");
                 }
                 // now that we made sure there's no active acquired children, we can mark scope as closed
-                //U.synchronizeThreads();
                 IS_ALIVE.set(this, false); // plain write is enough here (full write lock)
+                U.synchronizeThreads();
             } finally {
                 // leave critical section
                 lock.unlockWrite(stamp);
@@ -301,6 +301,7 @@ abstract class MemoryScope {
                 // pre-allocate duped scope so we don't get OOME later and be left with this scope closed
                 var duped = new Child(newOwner);
                 IS_ALIVE.setVolatile(this, false);
+                U.synchronizeThreads();
                 return duped;
             }
 
@@ -308,6 +309,7 @@ abstract class MemoryScope {
             void close() {
                 checkValidState(); // child scope is always checked
                 IS_ALIVE.set(this, false);
+                U.synchronizeThreads();
                 // following acts as a volatile write after plain write above so
                 // plain write gets flushed too (which is important for isAliveThreadSafe())
                 Root.this.acquired.decrement();
