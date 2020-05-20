@@ -45,6 +45,7 @@
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/orderAccess.hpp"
 #include "runtime/reflection.hpp"
+#include "runtime/handshake.hpp"
 #include "runtime/sharedRuntime.hpp"
 #include "runtime/thread.hpp"
 #include "runtime/threadSMR.hpp"
@@ -339,6 +340,30 @@ DEFINE_GETSETOOP_VOLATILE(jfloat, Float);
 DEFINE_GETSETOOP_VOLATILE(jdouble, Double);
 
 #undef DEFINE_GETSETOOP_VOLATILE
+
+UNSAFE_ENTRY(int, Unsafe_GetIntChecked(JNIEnv *env, jobject unsafe,
+                                       jobject obj_h, long offset,
+                                       jobject checkObj_h, long checkOffset)) {
+  oop checkObj = JNIHandles::resolve(checkObj_h);
+  bool isAllowed = checkObj != NULL && HeapAccess<MO_RELAXED>::load_at(checkObj, checkOffset);
+  if (isAllowed) {
+    return MemoryAccess<int>(thread, obj_h, offset).get();
+  } else {
+    THROW_0(vmSymbols::java_lang_IllegalArgumentException());
+  }
+} UNSAFE_END
+
+UNSAFE_ENTRY(void, Unsafe_PutIntChecked(JNIEnv *env, jobject unsafe,
+                                        jobject obj_h, long offset,
+                                        jobject checkObj_h, long checkOffset, int value)) {
+  oop checkObj = JNIHandles::resolve(checkObj_h);
+  bool isAllowed = checkObj != NULL && HeapAccess<MO_RELAXED>::load_at(checkObj, checkOffset);
+  if (isAllowed) {
+    MemoryAccess<int>(thread, obj_h, offset).put(value);
+  } else {
+    THROW(vmSymbols::java_lang_IllegalArgumentException());
+  }
+} UNSAFE_END
 
 UNSAFE_LEAF(void, Unsafe_LoadFence(JNIEnv *env, jobject unsafe)) {
   OrderAccess::acquire();
@@ -1051,6 +1076,18 @@ UNSAFE_ENTRY(jint, Unsafe_GetLoadAverage0(JNIEnv *env, jobject unsafe, jdoubleAr
   return ret;
 } UNSAFE_END
 
+class UnsafeSynchronizeThreadsClosure : public HandshakeClosure {
+public:
+  UnsafeSynchronizeThreadsClosure() :
+    HandshakeClosure("UnsafeSynchronizeThreads") {}
+
+  void do_thread(Thread* thread) {}
+};
+
+UNSAFE_ENTRY(void, Unsafe_SynchronizeThreads0(JNIEnv *env, jobject unsafe)) {
+  UnsafeSynchronizeThreadsClosure cl;
+  Handshake::execute(&cl);
+} UNSAFE_END
 
 /// JVM_RegisterUnsafeMethods
 
@@ -1119,6 +1156,11 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
     {CC "unpark",             CC "(" OBJ ")V",           FN_PTR(Unsafe_Unpark)},
 
     {CC "getLoadAverage0",    CC "([DI)I",               FN_PTR(Unsafe_GetLoadAverage0)},
+
+    {CC "synchronizeThreads0",CC "()V",                  FN_PTR(Unsafe_SynchronizeThreads0)},
+
+    {CC "getIntChecked",     CC "(" OBJ "J" OBJ "J)I",  FN_PTR(Unsafe_GetIntChecked)},
+    {CC "putIntChecked",     CC "(" OBJ "J" OBJ "JI)V", FN_PTR(Unsafe_PutIntChecked)},
 
     {CC "copyMemory0",        CC "(" OBJ "J" OBJ "JJ)V", FN_PTR(Unsafe_CopyMemory0)},
     {CC "copySwapMemory0",    CC "(" OBJ "J" OBJ "JJJ)V", FN_PTR(Unsafe_CopySwapMemory0)},

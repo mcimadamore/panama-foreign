@@ -676,6 +676,8 @@ bool vmIntrinsics::is_disabled_by_flags(vmIntrinsics::ID id) {
   case vmIntrinsics::_getAndSetInt:
   case vmIntrinsics::_getAndSetLong:
   case vmIntrinsics::_getAndSetReference:
+  case vmIntrinsics::_getIntChecked:
+  case vmIntrinsics::_putIntChecked:
   case vmIntrinsics::_loadFence:
   case vmIntrinsics::_storeFence:
   case vmIntrinsics::_fullFence:

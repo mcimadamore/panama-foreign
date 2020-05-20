@@ -1191,6 +1191,15 @@
   do_intrinsic(_putLong,            jdk_internal_misc_Unsafe,     putLong_name, putLong_signature,               F_RN)  \
   do_intrinsic(_putFloat,           jdk_internal_misc_Unsafe,     putFloat_name, putFloat_signature,             F_RN)  \
   do_intrinsic(_putDouble,          jdk_internal_misc_Unsafe,     putDouble_name, putDouble_signature,           F_RN)  \
+  \
+                                                                        \
+  do_signature(getIntChecked_signature,          "(Ljava/lang/Object;JLjava/lang/Object;J)I") \
+  do_signature(putIntChecked_signature,          "(Ljava/lang/Object;JLjava/lang/Object;JI)V") \
+  \
+  do_name(getIntChecked_name,"getIntChecked")                 do_name(putIntChecked_name,"putIntChecked") \
+  \
+  do_intrinsic(_getIntChecked,     jdk_internal_misc_Unsafe,     getIntChecked_name, getIntChecked_signature,    F_RN)  \
+  do_intrinsic(_putIntChecked,     jdk_internal_misc_Unsafe,     putIntChecked_name, putIntChecked_signature,    F_RN)  \
                                                                                                                         \
   do_name(getReferenceVolatile_name,"getReferenceVolatile")   do_name(putReferenceVolatile_name,"putReferenceVolatile") \
   do_name(getBooleanVolatile_name,"getBooleanVolatile")       do_name(putBooleanVolatile_name,"putBooleanVolatile")     \
@@ -1535,7 +1544,7 @@ class vmSymbols: AllStatic {
     FIRST_SID = NO_SID + 1
   };
   enum {
-    log2_SID_LIMIT = 10         // checked by an assert at start-up
+    log2_SID_LIMIT = 11         // checked by an assert at start-up
   };
 
  private:
