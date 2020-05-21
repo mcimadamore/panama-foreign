@@ -61,11 +61,11 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
     private static final boolean enableSmallSegments =
             Boolean.parseBoolean(GetPropertyAction.privilegedGetProperty("jdk.incubator.foreign.SmallSegments", "true"));
 
-    final static int ACCESS_MASK = READ | WRITE | CLOSE | ACQUIRE | HANDOFF;
+    final static int ACCESS_MASK = READ | WRITE | CLOSE | SHARE | HANDOFF;
     final static int FIRST_RESERVED_FLAG = 1 << 16; // upper 16 bits are reserved
     final static int SMALL = FIRST_RESERVED_FLAG;
     final static long NONCE = new Random().nextLong();
-    final static int DEFAULT_MASK = READ | WRITE | CLOSE | ACQUIRE | HANDOFF;
+    final static int DEFAULT_MASK = READ | WRITE | CLOSE | SHARE | HANDOFF;
 
     final static JavaNioAccess nioAccess = SharedSecrets.getJavaNioAccess();
 
@@ -198,15 +198,26 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         if (!isSet(HANDOFF)) {
             throw unsupportedAccessMode(HANDOFF);
         }
-        if (scope.ownerThread() == newOwner) {
-            throw new IllegalArgumentException("Segment already owned by thread: " + newOwner);
-        } else {
-            try {
-                return dup(0L, length, mask, scope.dup(newOwner));
-            } finally {
-                //flush read/writes to segment memory before returning the new segment
-                VarHandle.fullFence();
-            }
+        checkValidState();
+        try {
+            return dup(0L, length, mask, scope.dup(newOwner));
+        } finally {
+            //flush read/writes to segment memory before returning the new segment
+            VarHandle.fullFence();
+        }
+    }
+
+    @Override
+    public MemorySegment share() {
+        if (!isSet(SHARE)) {
+            throw unsupportedAccessMode(SHARE);
+        }
+        checkValidState();
+        try {
+            return dup(0L, length, mask, scope.dup(null));
+        } finally {
+            //flush read/writes to segment memory before returning the new segment
+            VarHandle.fullFence();
         }
     }
 
@@ -215,18 +226,8 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         if (!isSet(CLOSE)) {
             throw unsupportedAccessMode(CLOSE);
         }
-        closeNoCheck();
-    }
-
-    private final void closeNoCheck() {
+        checkValidState();
         scope.close();
-    }
-
-    final AbstractMemorySegmentImpl acquire() {
-        if (Thread.currentThread() != ownerThread() && !isSet(ACQUIRE)) {
-            throw unsupportedAccessMode(ACQUIRE);
-        }
-        return dup(0, length, mask, scope.acquire());
     }
 
     @Override
@@ -305,7 +306,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         if ((mode & CLOSE) != 0) {
             modes.add("CLOSE");
         }
-        if ((mode & ACQUIRE) != 0) {
+        if ((mode & SHARE) != 0) {
             modes.add("ACQUIRE");
         }
         if ((mode & HANDOFF) != 0) {
@@ -356,11 +357,9 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         public boolean tryAdvance(Consumer<? super MemorySegment> action) {
             Objects.requireNonNull(action);
             if (currentIndex < elemCount) {
-                AbstractMemorySegmentImpl acquired = segment.acquire();
                 try {
-                    action.accept(acquired.asSliceNoCheck(currentIndex * elementSize, elementSize));
+                    action.accept(segment.asSliceNoCheck(currentIndex * elementSize, elementSize));
                 } finally {
-                    acquired.closeNoCheck();
                     currentIndex++;
                     if (currentIndex == elemCount) {
                         segment = null;
@@ -376,22 +375,20 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         public void forEachRemaining(Consumer<? super MemorySegment> action) {
             Objects.requireNonNull(action);
             if (currentIndex < elemCount) {
-                AbstractMemorySegmentImpl acquired = segment.acquire();
                 try {
-                    if (acquired.isSmall()) {
+                    if (segment.isSmall()) {
                         int index = (int) currentIndex;
                         int limit = (int) elemCount;
                         int elemSize = (int) elementSize;
                         for (; index < limit; index++) {
-                            action.accept(acquired.asSliceNoCheck(index * elemSize, elemSize));
+                            action.accept(segment.asSliceNoCheck(index * elemSize, elemSize));
                         }
                     } else {
                         for (long i = currentIndex ; i < elemCount ; i++) {
-                            action.accept(acquired.asSliceNoCheck(i * elementSize, elementSize));
+                            action.accept(segment.asSliceNoCheck(i * elementSize, elementSize));
                         }
                     }
                 } finally {
-                    acquired.closeNoCheck();
                     currentIndex = elemCount;
                     segment = null;
                 }
@@ -432,7 +429,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
             bufferScope = bufferSegment.scope;
             modes = bufferSegment.mask;
         } else {
-            bufferScope = MemoryScope.create(bb, null);
+            bufferScope = MemoryScope.ofConfined(null, bb);
             modes = defaultAccessModes(size);
         }
         if (bb.isReadOnly()) {
@@ -447,8 +444,8 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         }
     }
 
-    public static AbstractMemorySegmentImpl NOTHING = new AbstractMemorySegmentImpl(
-        0, 0, MemoryScope.createUnchecked(null, null, null)
+    public final static AbstractMemorySegmentImpl NOTHING = new AbstractMemorySegmentImpl(
+        0, 0, MemoryScope.ofShared(null, null)
     ) {
         @Override
         ByteBuffer makeByteBuffer() {

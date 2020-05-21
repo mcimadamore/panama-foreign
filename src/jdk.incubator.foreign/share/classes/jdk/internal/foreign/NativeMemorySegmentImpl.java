@@ -93,7 +93,7 @@ public class NativeMemorySegmentImpl extends AbstractMemorySegmentImpl {
             unsafe.setMemory(buf, alignedSize, (byte)0);
         }
         long alignedBuf = Utils.alignUp(buf, alignmentBytes);
-        MemoryScope scope = MemoryScope.create(null, () -> unsafe.freeMemory(buf));
+        MemoryScope scope = MemoryScope.ofConfined(() -> unsafe.freeMemory(buf), null);
         MemorySegment segment = new NativeMemorySegmentImpl(buf, alignedSize,
                                                             defaultAccessModes(alignedSize),
                                                             scope);
@@ -105,7 +105,9 @@ public class NativeMemorySegmentImpl extends AbstractMemorySegmentImpl {
     }
 
     public static MemorySegment makeNativeSegmentUnchecked(MemoryAddress min, long bytesSize, Thread owner, Runnable cleanup, Object attachment) {
-        MemoryScope scope = MemoryScope.createUnchecked(owner, attachment, cleanup);
+        MemoryScope scope = owner != null ?
+                MemoryScope.ofConfined(owner, cleanup, attachment) :
+                MemoryScope.ofShared(cleanup, attachment);
         return new NativeMemorySegmentImpl(min.toRawLongValue(), bytesSize, defaultAccessModes(bytesSize), scope);
     }
 }

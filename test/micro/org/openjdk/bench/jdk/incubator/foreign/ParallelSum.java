@@ -88,7 +88,7 @@ public class ParallelSum {
         for (int i = 0; i < ELEM_SIZE; i++) {
             unsafe.putInt(address + (i * CARRIER_SIZE), i);
         }
-        segment = MemorySegment.allocateNative(ALLOC_SIZE);
+        segment = MemorySegment.allocateNative(ALLOC_SIZE).share();
         for (int i = 0; i < ELEM_SIZE; i++) {
             VH_int.set(segment.baseAddress(), (long) i, i);
         }
@@ -153,33 +153,33 @@ public class ParallelSum {
         return res;
     };
 
-//    @Benchmark
-//    public Optional<MemorySegment> segment_stream_findany_serial() {
-//        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT), false)
-//                .filter(FIND_SINGLE)
-//                .findAny();
-//    }
-//
-//    @Benchmark
-//    public Optional<MemorySegment> segment_stream_findany_parallel() {
-//        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT), true)
-//                .filter(FIND_SINGLE)
-//                .findAny();
-//    }
-//
-//    @Benchmark
-//    public Optional<MemorySegment> segment_stream_findany_serial_bulk() {
-//        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT_BULK), false)
-//                .filter(FIND_BULK)
-//                .findAny();
-//    }
-//
-//    @Benchmark
-//    public Optional<MemorySegment> segment_stream_findany_parallel_bulk() {
-//        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT_BULK), true)
-//                .filter(FIND_BULK)
-//                .findAny();
-//    }
+    @Benchmark
+    public Optional<MemorySegment> segment_stream_findany_serial() {
+        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT), false)
+                .filter(FIND_SINGLE)
+                .findAny();
+    }
+
+    @Benchmark
+    public Optional<MemorySegment> segment_stream_findany_parallel() {
+        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT), true)
+                .filter(FIND_SINGLE)
+                .findAny();
+    }
+
+    @Benchmark
+    public Optional<MemorySegment> segment_stream_findany_serial_bulk() {
+        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT_BULK), false)
+                .filter(FIND_BULK)
+                .findAny();
+    }
+
+    @Benchmark
+    public Optional<MemorySegment> segment_stream_findany_parallel_bulk() {
+        return StreamSupport.stream(MemorySegment.spliterator(segment, SEQUENCE_LAYOUT_BULK), true)
+                .filter(FIND_BULK)
+                .findAny();
+    }
 
     final static Predicate<MemorySegment> FIND_SINGLE = slice ->
             (int)VH_int.get(slice.baseAddress(), 0L) == (ELEM_SIZE - 1);
@@ -215,8 +215,14 @@ public class ParallelSum {
         @Override
         protected Integer compute() {
             if (length > SPLIT_THRESHOLD) {
-                SumUnsafe s1 = new SumUnsafe(address, start, length / 2);
-                SumUnsafe s2 = new SumUnsafe(address, length / 2, length / 2);
+                int elemCount = length / CARRIER_SIZE;
+                int rem = elemCount % 2;
+                int split = elemCount / 2;
+                int lobound = split * CARRIER_SIZE;
+                int hibound = lobound + (rem * CARRIER_SIZE);
+
+                SumUnsafe s1 = new SumUnsafe(address, start + lobound, hibound);
+                SumUnsafe s2 = new SumUnsafe(address, start, lobound);
                 s1.fork();
                 s2.fork();
                 return s1.join() + s2.join();
