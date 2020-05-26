@@ -2428,11 +2428,6 @@ bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, c
   Node* offset = top();
   Node* val;
 
-  Node* check_adr;
-  const TypeRawPtr* check_adr_type;
-  Node* check_base_oop;
-  Node* check_offset;
-
   // The base is either a Java object or a value produced by Unsafe.staticFieldBase
   Node* base = argument(1);  // type: oop
   // The offset is a value produced by Unsafe.staticFieldOffset or Unsafe.objectFieldOffset
@@ -2446,11 +2441,27 @@ bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, c
   offset = ConvL2X(offset);
   adr = make_unsafe_address(base, offset, is_store ? ACCESS_WRITE : ACCESS_READ, type, kind == Relaxed);
 
+  if (stopped()) {
+    return false;
+  }
+
   if (checked) {
-    check_base_oop = argument(3);
-    check_offset = argument(4);
-    check_adr = basic_plus_adr(must_be_not_null(check_base_oop, true), check_offset);
-    check_adr_type = TypeRawPtr::BOTTOM;
+    Node* check_base_oop = must_be_not_null(argument(4), false);
+    Node* check_offset = ConvL2X(argument(5));
+    Node* check_adr = basic_plus_adr(check_base_oop, check_offset);
+
+    Node* check_load = access_load_at(check_base_oop, check_adr, TypeRawPtr::BOTTOM,
+                                      TypeInt::BOOL, T_BOOLEAN, IN_HEAP | C2_CONTROL_DEPENDENT_LOAD);
+    Node* check_cmp  = _gvn.transform(new CmpINode(check_load, intcon(0)));
+    Node* check_bool = _gvn.transform(new BoolNode(check_cmp, BoolTest::ne));
+
+    BuildCutout unless(this, check_bool, PROB_ALWAYS);
+    uncommon_trap(Deoptimization::Reason_intrinsic,
+                  Deoptimization::Action_maybe_recompile);
+  }
+
+  if (stopped()) {
+    return false;
   }
 
   if (_gvn.type(base)->isa_ptr() == TypePtr::NULL_PTR) {
@@ -2470,7 +2481,7 @@ bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, c
     decorators |= IN_HEAP;
   }
 
-  val = is_store ? argument(checked ? 6 : 4) : NULL;
+  val = is_store ? argument(checked ? 7 : 4) : NULL;
 
   const TypePtr* adr_type = _gvn.type(adr)->isa_ptr();
   if (adr_type == TypePtr::NULL_PTR) {
@@ -2535,29 +2546,6 @@ bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, c
   // as a courtesy.  However, this is not guaranteed by Unsafe,
   // and it is not possible to fully distinguish unintended nulls
   // from intended ones in this API.
-
-  if (checked) {
-    Node* check_load = access_load_at(check_base_oop, check_adr, check_adr_type, Type::get_const_basic_type(T_BOOLEAN), T_BOOLEAN, IN_HEAP | C2_CONTROL_DEPENDENT_LOAD);
-    Node* check_cmp = _gvn.transform(new CmpUNode(check_load, _gvn.makecon(TypeInt::ZERO)));
-    Node* check_bool = _gvn.transform(new BoolNode(check_cmp, BoolTest::eq));
-    IfNode* iff = create_and_map_if(control(), check_bool, PROB_UNLIKELY_MAG(3), COUNT_UNKNOWN);
-    Node* if_true = _gvn.transform(new IfTrueNode(iff));
-    Node* if_false = _gvn.transform(new IfFalseNode(iff));
-
-    {
-      // Deopt and re-execute in interpreter on exception paths.
-      PreserveJVMState pjvms(this);
-      set_control(if_true);
-      uncommon_trap(Deoptimization::Reason_intrinsic,
-                    Deoptimization::Action_maybe_recompile);
-    }
-
-    RegionNode* region = new RegionNode(3);
-    region->init_req(1, control());
-    region->init_req(2, if_false);
-
-    set_control(_gvn.transform(region));
-  }
 
   if (!is_store) {
     Node* p = NULL;
