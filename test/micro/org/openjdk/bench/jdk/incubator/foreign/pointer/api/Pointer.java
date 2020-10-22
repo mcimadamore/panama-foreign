@@ -1,85 +1,74 @@
 package jdk.incubator.foreign.pointer.api;
 
-import jdk.incubator.foreign.MemoryAddress;
-import jdk.incubator.foreign.MemoryHandles;
 import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemorySegment;
 
-import java.lang.invoke.VarHandle;
-import java.nio.ByteOrder;
+public abstract class Pointer<X> {
+    private final MemorySegment segment;
+    private final MemoryLayout type;
 
-public class Pointer<X> {
-    private final long addr;
-    private final ForeignType<X> type;
-
-    private final static MemorySegment EVERYTHING = MemorySegment.ofNativeRestricted();
-
-    public Pointer(MemoryAddress addr, ForeignType<X> type) {
-        this(addr.toRawLongValue(), type);
+    Pointer(MemorySegment segment, MemoryLayout layout) {
+        this.segment = segment;
+        this.type = layout;
     }
 
-    private Pointer(long addr, ForeignType<X> type) {
-        this.addr = addr;
-        this.type = type;
-    }
+    abstract X getInternal(long index);
+
+    abstract void setInternal(long index, X x);
 
     @SuppressWarnings("unchecked")
     public X get() {
-        return type.get(EVERYTHING, addr);
+        return getInternal(0);
     }
     @SuppressWarnings("unchecked")
     public X get(long index) {
-        return type.get(EVERYTHING, addr + (type.byteSize() * index));
+        return getInternal(index);
     }
     public void set(X x) {
-        type.set(EVERYTHING, addr, x);
+        setInternal(0, x);
     }
     public void set(long index, X x) {
-        type.set(EVERYTHING, addr + (type.byteSize() * index), x);
+        setInternal(index, x);
     }
 
-    public ForeignType<X> type() {
+    public MemoryLayout type() {
         return type;
     }
 
-    public MemoryAddress addr() {
-        return MemoryAddress.ofLong(addr);
+    public MemorySegment segment() {
+        return segment;
     }
 
     public long toRawLongValue() {
-        return addr;
+        return segment.address().toRawLongValue();
     }
 
-    public MemorySegment segment(long nelems) {
-        return MemorySegment.ofNativeRestricted().asSlice(addr, nelems * type.layout().byteSize());
-    }
-
-    static class PointerType<X> extends ForeignType<Pointer<X>> {
-
-        static final VarHandle handle = MemoryHandles.varHandle(long.class, ByteOrder.nativeOrder());
-
-        private final ForeignType<X> pointee;
-        private final MemoryLayout layout;
-
-        PointerType(MemoryLayout layout, ForeignType<X> pointee) {
-            this.layout = layout;
-            this.pointee = pointee;
-        }
-
-        @Override
-        public MemoryLayout layout() {
-            return layout;
-        }
-
-        @Override
-        public Pointer<X> get(MemorySegment base, long offset) {
-            long addr = (long)handle.get(base, offset);
-            return new Pointer<>(addr, pointee);
-        }
-
-        @Override
-        public void set(MemorySegment base, long offset, Pointer<X> xPointer) {
-            handle.set(base, offset, xPointer.addr().toRawLongValue());
-        }
-    };
+//    static class PointerType<X> extends ForeignType<Pointer<X>> {
+//
+//        static final VarHandle handle = MemoryHandles.varHandle(long.class, ByteOrder.nativeOrder());
+//
+//        private final ForeignType<X> pointee;
+//        private final MemoryLayout layout;
+//
+//        PointerType(MemoryLayout layout, ForeignType<X> pointee) {
+//            this.layout = layout;
+//            this.pointee = pointee;
+//        }
+//
+//        @Override
+//        MemoryLayout layout() {
+//            return layout;
+//        }
+//
+//        @Override
+//        Pointer<X> get(MemorySegment base, long offset) {
+//            long addr = (long)handle.get(base, offset);
+//            return new Pointer<>(addr, pointee);
+//        }
+//
+//        @Override
+//        void set(MemorySegment base, long offset, Pointer<X> xPointer) {
+//            handle.set(base, offset, xPointer.addr().toRawLongValue());
+//        }
+//    };
 }

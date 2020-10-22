@@ -11,50 +11,46 @@ public class Point {
         this.segment = segment;
     }
 
-    static final MemoryLayout LAYOUT = MemoryLayout.ofStruct(
-            c_int.TYPE.layout().withName("x"),
-            c_int.TYPE.layout().withName("y"));
-    
+    public static final MemoryLayout LAYOUT = MemoryLayout.ofStruct(
+            c_int.LAYOUT.withName("x"),
+            c_int.LAYOUT.withName("y"));
+
     static final long X_OFFSET = LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("x"));
     static final long Y_OFFSET = LAYOUT.byteOffset(MemoryLayout.PathElement.groupElement("y"));
-    
+
     public c_int x$get() {
-        return c_int.TYPE.get(segment, X_OFFSET);
+        return c_int.get(segment, 0);
     }
 
     public c_int y$get() {
-        return c_int.TYPE.get(segment, Y_OFFSET);
+        return c_int.get(segment, 1);
     }
 
     public void x$set(c_int x) {
-        c_int.TYPE.set(segment, X_OFFSET, x);
+        c_int.set(segment, 0, x);
     }
 
     public void y$set(c_int y) {
-        c_int.TYPE.set(segment, Y_OFFSET, y);
+        c_int.set(segment, 1, y);
     }
 
-    static class PointType extends ForeignType<Point> {
-        @Override
-        public MemoryLayout layout() {
-            return LAYOUT;
-        }
+    public static Pointer<Point> allocate(long size) {
+        MemorySegment segment = MemorySegment.allocateNative(MemoryLayout.ofSequence(size, LAYOUT));
+        return new Pointer<Point>(segment, LAYOUT) {
+            @Override
+            Point getInternal(long index) {
+                MemorySegment slice = pointSlice(segment, index * LAYOUT.byteSize());
+                return new Point(slice);
+            }
 
-        @Override
-        public Point get(MemorySegment base, long offset) {
-            MemorySegment segment = pointSlice(base, offset);
-            return new Point(segment);
-        }
+            @Override
+            void setInternal(long index, Point point) {
+                pointSlice(segment, index * LAYOUT.byteSize()).copyFrom(point.segment);
+            }
 
-        @Override
-        public void set(MemorySegment address, long offset, Point p) {
-            pointSlice(address, offset).copyFrom(p.segment);
-        }
-
-        static MemorySegment pointSlice(MemorySegment base, long offset) {
-            return base.asSlice(offset, LAYOUT.byteSize());
-        }
-    };
-
-    public static ForeignType<Point> TYPE = new PointType();
+            MemorySegment pointSlice(MemorySegment base, long offset) {
+                return base.asSlice(offset, LAYOUT.byteSize());
+            }
+        };
+    }
 }

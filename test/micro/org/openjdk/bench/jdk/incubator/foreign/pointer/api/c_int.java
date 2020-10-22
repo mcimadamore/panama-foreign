@@ -1,9 +1,6 @@
 package jdk.incubator.foreign.pointer.api;
 
-import jdk.incubator.foreign.MemoryHandles;
-import jdk.incubator.foreign.MemoryLayout;
-import jdk.incubator.foreign.MemoryLayouts;
-import jdk.incubator.foreign.MemorySegment;
+import jdk.incubator.foreign.*;
 
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
@@ -19,27 +16,29 @@ public class c_int {
         return value;
     }
 
-    static final VarHandle handle = MemoryHandles.varHandle(int.class, ByteOrder.nativeOrder());
+    public static final MemoryLayout LAYOUT = MemoryLayouts.JAVA_INT;
 
-    public static class IntType extends ForeignType<c_int> {
-        @Override
-        public MemoryLayout layout() {
-            return MemoryLayouts.JAVA_INT;
-        }
+    public static Pointer<c_int> allocate(long size) {
+        MemorySegment segment = MemorySegment.allocateNative(MemoryLayout.ofSequence(size, LAYOUT));
+        return new Pointer<c_int>(segment, LAYOUT) {
+            @Override
+            c_int getInternal(long index) {
+                return c_int.get(segment, index);
+            }
 
-        @Override
-        public c_int get(MemorySegment base, long offset) {
-            int value = (int)handle.get(base, offset);
-            return new c_int(value);
-        }
-
-        @Override
-        public void set(MemorySegment base, long offset, c_int c_int) {
-            handle.set(base, offset, c_int.value());
-        }
+            @Override
+            void setInternal(long index, c_int x) {
+                c_int.set(segment, index, x);
+            }
+        };
     }
 
-    public static final ForeignType<c_int> TYPE = new IntType();
+    static c_int get(MemorySegment segment, long index) {
+        int value = MemoryAccess.getIntAtIndex(segment, index);
+        return new c_int(value);
+    }
 
-    public static final IntType INT_TYPE = new IntType();
+    static void set(MemorySegment segment, long index, c_int c_int) {
+        MemoryAccess.setIntAtIndex(segment, index, c_int.value());
+    }
 }
