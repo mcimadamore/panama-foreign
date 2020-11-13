@@ -39,7 +39,7 @@ import java.util.Objects;
 /**
  * This class manages the temporal bounds associated with a memory segment as well
  * as thread confinement. A scope has a liveness bit, which is updated when the scope is closed
- * (this operation is triggered by {@link AbstractMemorySegmentImpl#close()}). This bit is consulted prior
+ * (this operation is triggered by {@link MemorySegmentImpl#close()}). This bit is consulted prior
  * to memory access (see {@link #checkValidState()}).
  * There are two kinds of memory scope: confined memory scope and shared memory scope.
  * A confined memory scope has an associated owner thread that confines some operations to

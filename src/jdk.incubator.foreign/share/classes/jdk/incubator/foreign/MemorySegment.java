@@ -30,10 +30,8 @@ import java.io.FileDescriptor;
 import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
 
-import jdk.internal.foreign.AbstractMemorySegmentImpl;
-import jdk.internal.foreign.HeapMemorySegmentImpl;
-import jdk.internal.foreign.MappedMemorySegmentImpl;
-import jdk.internal.foreign.NativeMemorySegmentImpl;
+import jdk.internal.foreign.MemorySegmentImpl;
+import jdk.internal.foreign.MemorySegmentImpl;
 import jdk.internal.foreign.Utils;
 
 import java.io.IOException;
@@ -677,7 +675,7 @@ for (long l = 0; l < segment.byteSize(); l++) {
      * @return a new confined buffer memory segment.
      */
     static MemorySegment ofByteBuffer(ByteBuffer bb) {
-        return AbstractMemorySegmentImpl.ofBuffer(bb);
+        return MemorySegmentImpl.ofBuffer(bb);
     }
 
     /**
@@ -691,7 +689,7 @@ for (long l = 0; l < segment.byteSize(); l++) {
      * @return a new confined array memory segment.
      */
     static MemorySegment ofArray(byte[] arr) {
-        return HeapMemorySegmentImpl.makeArraySegment(arr);
+        return MemorySegmentImpl.makeArraySegment(arr);
     }
 
     /**
@@ -705,7 +703,7 @@ for (long l = 0; l < segment.byteSize(); l++) {
      * @return a new confined array memory segment.
      */
     static MemorySegment ofArray(char[] arr) {
-        return HeapMemorySegmentImpl.makeArraySegment(arr);
+        return MemorySegmentImpl.makeArraySegment(arr);
     }
 
     /**
@@ -719,7 +717,7 @@ for (long l = 0; l < segment.byteSize(); l++) {
      * @return a new confined array memory segment.
      */
     static MemorySegment ofArray(short[] arr) {
-        return HeapMemorySegmentImpl.makeArraySegment(arr);
+        return MemorySegmentImpl.makeArraySegment(arr);
     }
 
     /**
@@ -733,7 +731,7 @@ for (long l = 0; l < segment.byteSize(); l++) {
      * @return a new confined array memory segment.
      */
     static MemorySegment ofArray(int[] arr) {
-        return HeapMemorySegmentImpl.makeArraySegment(arr);
+        return MemorySegmentImpl.makeArraySegment(arr);
     }
 
     /**
@@ -747,7 +745,7 @@ for (long l = 0; l < segment.byteSize(); l++) {
      * @return a new confined array memory segment.
      */
     static MemorySegment ofArray(float[] arr) {
-        return HeapMemorySegmentImpl.makeArraySegment(arr);
+        return MemorySegmentImpl.makeArraySegment(arr);
     }
 
     /**
@@ -761,7 +759,7 @@ for (long l = 0; l < segment.byteSize(); l++) {
      * @return a new confined array memory segment.
      */
     static MemorySegment ofArray(long[] arr) {
-        return HeapMemorySegmentImpl.makeArraySegment(arr);
+        return MemorySegmentImpl.makeArraySegment(arr);
     }
 
     /**
@@ -775,7 +773,7 @@ for (long l = 0; l < segment.byteSize(); l++) {
      * @return a new confined array memory segment.
      */
     static MemorySegment ofArray(double[] arr) {
-        return HeapMemorySegmentImpl.makeArraySegment(arr);
+        return MemorySegmentImpl.makeArraySegment(arr);
     }
 
     /**
@@ -859,7 +857,7 @@ allocateNative(bytesSize, 1);
      * write access if the file is opened for writing.
      */
     static MemorySegment mapFile(Path path, long bytesOffset, long bytesSize, FileChannel.MapMode mapMode) throws IOException {
-        return MappedMemorySegmentImpl.makeMappedSegment(path, bytesOffset, bytesSize, mapMode);
+        return MemorySegmentImpl.makeMappedSegment(path, bytesOffset, bytesSize, mapMode);
     }
 
     /**
@@ -887,7 +885,7 @@ allocateNative(bytesSize, 1);
             throw new IllegalArgumentException("Invalid alignment constraint : " + alignmentBytes);
         }
 
-        return NativeMemorySegmentImpl.makeNativeSegment(bytesSize, alignmentBytes);
+        return MemorySegmentImpl.makeNativeSegment(bytesSize, alignmentBytes);
     }
 
     /**
@@ -911,7 +909,7 @@ allocateNative(bytesSize, 1);
      */
     static MemorySegment ofNativeRestricted() {
         Utils.checkRestrictedAccess("MemorySegment.ofNativeRestricted");
-        return NativeMemorySegmentImpl.EVERYTHING;
+        return MemorySegmentImpl.EVERYTHING;
     }
 
     // access mode masks

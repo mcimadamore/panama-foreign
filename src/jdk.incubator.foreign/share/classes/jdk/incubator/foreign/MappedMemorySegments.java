@@ -25,7 +25,7 @@
 
 package jdk.incubator.foreign;
 
-import jdk.internal.foreign.MappedMemorySegmentImpl;
+import jdk.internal.foreign.MemorySegmentImpl;
 
 import java.nio.MappedByteBuffer;
 
@@ -77,7 +77,7 @@ public final class MappedMemorySegments {
      * {@code segment.isMapped() == false}.
      */
     public static boolean isLoaded(MemorySegment segment) {
-        return toMappedSegment(segment).isLoaded();
+        return MemorySegmentImpl.isLoaded(segment);
     }
 
     /**
@@ -96,7 +96,7 @@ public final class MappedMemorySegments {
      * {@code segment.isMapped() == false}.
      */
     public static void load(MemorySegment segment) {
-        toMappedSegment(segment).load();
+        MemorySegmentImpl.load(segment);
     }
 
     /**
@@ -115,7 +115,7 @@ public final class MappedMemorySegments {
      * {@code segment.isMapped() == false}.
      */
     public static void unload(MemorySegment segment) {
-        toMappedSegment(segment).unload();
+        MemorySegmentImpl.unload(segment);
     }
 
     /**
@@ -147,14 +147,6 @@ public final class MappedMemorySegments {
      * {@code segment.isMapped() == false}.
      */
     public static void force(MemorySegment segment) {
-        toMappedSegment(segment).force();
-    }
-
-    static MappedMemorySegmentImpl toMappedSegment(MemorySegment segment) {
-        if (segment instanceof MappedMemorySegmentImpl) {
-            return (MappedMemorySegmentImpl)segment;
-        } else {
-            throw new UnsupportedOperationException("Not a mapped memory segment");
-        }
+        MemorySegmentImpl.force(segment);
     }
 }

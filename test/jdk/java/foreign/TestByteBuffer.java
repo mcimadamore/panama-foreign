@@ -72,9 +72,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import jdk.internal.foreign.HeapMemorySegmentImpl;
-import jdk.internal.foreign.MappedMemorySegmentImpl;
-import jdk.internal.foreign.NativeMemorySegmentImpl;
+import jdk.internal.foreign.MemorySegmentImpl;
 import org.testng.SkipException;
 import org.testng.annotations.*;
 import sun.nio.ch.DirectBuffer;
@@ -763,9 +761,9 @@ public class TestByteBuffer {
 
     @DataProvider(name = "bufferSources")
     public static Object[][] bufferSources() {
-        Predicate<MemorySegment> heapTest = segment -> segment instanceof HeapMemorySegmentImpl;
-        Predicate<MemorySegment> nativeTest = segment -> segment instanceof NativeMemorySegmentImpl;
-        Predicate<MemorySegment> mappedTest = segment -> segment instanceof MappedMemorySegmentImpl;
+        Predicate<MemorySegment> heapTest = segment -> ((MemorySegmentImpl)segment).unsafeGetBase() != null;
+        Predicate<MemorySegment> nativeTest = segment -> ((MemorySegmentImpl)segment).unsafeGetBase() == null;
+        Predicate<MemorySegment> mappedTest = MemorySegment::isMapped;
         try (FileChannel channel = FileChannel.open(tempPath, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
             return new Object[][]{
                     { ByteBuffer.wrap(new byte[256]), heapTest },

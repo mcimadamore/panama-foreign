@@ -49,11 +49,11 @@ public final class MemoryAddressImpl implements MemoryAddress {
     @Override
     public long segmentOffset(MemorySegment segment) {
         Objects.requireNonNull(segment);
-        AbstractMemorySegmentImpl segmentImpl = (AbstractMemorySegmentImpl)segment;
+        MemorySegmentImpl segmentImpl = (MemorySegmentImpl)segment;
         if (segmentImpl.base() != base) {
             throw new IllegalArgumentException("Invalid segment: " + segment);
         }
-        return offset - segmentImpl.min();
+        return offset - segmentImpl.min;
     }
 
     @Override
@@ -98,6 +98,6 @@ public final class MemoryAddressImpl implements MemoryAddress {
         if (bytesSize <= 0) {
             throw new IllegalArgumentException("Invalid size : " + bytesSize);
         }
-        return NativeMemorySegmentImpl.makeNativeSegmentUnchecked(this, bytesSize, cleanupAction, attachment);
+        return MemorySegmentImpl.makeNativeSegmentUnchecked(this, bytesSize, cleanupAction, attachment);
     }
 }

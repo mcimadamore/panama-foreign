@@ -31,29 +31,36 @@ import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.foreign.MemorySegmentProxy;
 import jdk.internal.access.foreign.UnmapperProxy;
 import jdk.internal.misc.ScopedMemoryAccess;
+import jdk.internal.misc.Unsafe;
+import jdk.internal.misc.VM;
 import jdk.internal.util.ArraysSupport;
 import jdk.internal.vm.annotation.ForceInline;
+import sun.nio.ch.FileChannelImpl;
+import sun.security.action.GetBooleanAction;
 import sun.security.action.GetPropertyAction;
 
 import java.io.FileDescriptor;
+import java.io.IOException;
 import java.lang.invoke.VarHandle;
 import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
 /**
- * This abstract class provides an immutable implementation for the {@code MemorySegment} interface. This class contains information
+ * This class provides an immutable implementation for the {@code MemorySegment} interface. This class contains information
  * about the segment's spatial and temporal bounds; each memory segment implementation is associated with an owner thread which is set at creation time.
  * Access to certain sensitive operations on the memory segment will fail with {@code IllegalStateException} if the
  * segment is either in an invalid state (e.g. it has already been closed) or if access occurs from a thread other
- * than the owner thread. See {@link MemoryScope} for more details on management of temporal bounds. Subclasses
- * are defined for each memory segment kind, see {@link NativeMemorySegmentImpl}, {@link HeapMemorySegmentImpl} and
- * {@link MappedMemorySegmentImpl}.
+ * than the owner thread. See {@link MemoryScope} for more details on management of temporal bounds.
  */
-public abstract class AbstractMemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
+public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
 
     private static final ScopedMemoryAccess SCOPED_MEMORY_ACCESS = ScopedMemoryAccess.getScopedMemoryAccess();
 
@@ -62,6 +69,17 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
 
     final static int FIRST_RESERVED_FLAG = 1 << 16; // upper 16 bits are reserved
     final static int SMALL = FIRST_RESERVED_FLAG;
+
+    final static byte NO_KIND = 0;
+    final static byte BYTE_KIND = 1;
+    final static byte CHAR_KIND = 2;
+    final static byte SHORT_KIND = 3;
+    final static byte INT_KIND = 4;
+    final static byte FLOAT_KIND = 5;
+    final static byte LONG_KIND = 6;
+    final static byte DOUBLE_KIND = 7;
+
+
     final static long NONCE = new Random().nextLong();
 
     final static JavaNioAccess nioAccess = SharedSecrets.getJavaNioAccess();
@@ -69,21 +87,40 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
     final long length;
     final int mask;
     final MemoryScope scope;
+    final long min;
+    final Object base;
+    final UnmapperProxy unmapper;
+    final byte kind;
 
     @ForceInline
-    AbstractMemorySegmentImpl(long length, int mask, MemoryScope scope) {
+    MemorySegmentImpl(byte kind, long min, Object base, UnmapperProxy unmapper, long length, int mask, MemoryScope scope) {
         this.length = length;
         this.mask = mask;
         this.scope = scope;
+        this.min = min;
+        this.base = base;
+        this.unmapper = unmapper;
+        this.kind = kind;
     }
 
-    abstract long min();
+    final Object base() {
+        return switch (kind) {
+            case NO_KIND -> null;
+            case BYTE_KIND -> (byte[])base;
+            case CHAR_KIND -> (char[])base;
+            case SHORT_KIND -> (short[])base;
+            case INT_KIND -> (int[])base;
+            case FLOAT_KIND -> (float[])base;
+            case LONG_KIND -> (long[])base;
+            case DOUBLE_KIND -> (double[])base;
+            default -> throw new AssertionError();
+        };
+    }
 
-    abstract Object base();
-
-    abstract AbstractMemorySegmentImpl dup(long offset, long size, int mask, MemoryScope scope);
-
-    abstract ByteBuffer makeByteBuffer();
+    @Override
+    public boolean isMapped() {
+        return unmapper != null;
+    }
 
     static int defaultAccessModes(long size) {
         return (enableSmallSegments && size < Integer.MAX_VALUE) ?
@@ -92,19 +129,19 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
     }
 
     @Override
-    public AbstractMemorySegmentImpl asSlice(long offset, long newSize) {
+    public MemorySegmentImpl asSlice(long offset, long newSize) {
         checkBounds(offset, newSize);
         return asSliceNoCheck(offset, newSize);
     }
 
     @Override
-    public AbstractMemorySegmentImpl asSlice(long offset) {
+    public MemorySegmentImpl asSlice(long offset) {
         checkBounds(offset, 0);
         return asSliceNoCheck(offset, length - offset);
     }
 
-    private AbstractMemorySegmentImpl asSliceNoCheck(long offset, long newSize) {
-        return dup(offset, newSize, mask, scope);
+    private MemorySegmentImpl asSliceNoCheck(long offset, long newSize) {
+        return new MemorySegmentImpl(kind, min + offset, base, unmapper, newSize, mask, scope);
     }
 
     @Override
@@ -120,23 +157,26 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
     @Override
     public final MemorySegment fill(byte value){
         checkAccess(0, length, false);
-        SCOPED_MEMORY_ACCESS.setMemory(scope, base(), min(), length, value);
+        SCOPED_MEMORY_ACCESS.setMemory(scope, base(), min, length, value);
         return this;
     }
 
     public void copyFrom(MemorySegment src) {
-        AbstractMemorySegmentImpl that = (AbstractMemorySegmentImpl)src;
+        MemorySegmentImpl that = (MemorySegmentImpl)src;
         long size = that.byteSize();
         checkAccess(0, size, false);
         that.checkAccess(0, size, true);
         SCOPED_MEMORY_ACCESS.copyMemory(scope, that.scope,
-                that.base(), that.min(),
-                base(), min(), size);
+                that.base(), that.min,
+                base(), min, size);
     }
+
+    private final static VarHandle BYTE_HANDLE = MemoryLayout.ofSequence(MemoryLayouts.JAVA_BYTE)
+            .varHandle(byte.class, MemoryLayout.PathElement.sequenceElement());
 
     @Override
     public long mismatch(MemorySegment other) {
-        AbstractMemorySegmentImpl that = (AbstractMemorySegmentImpl)other;
+        MemorySegmentImpl that = (MemorySegmentImpl)other;
         final long thisSize = this.byteSize();
         final long thatSize = that.byteSize();
         final long length = Math.min(thisSize, thatSize);
@@ -149,12 +189,12 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
 
         long i = 0;
         if (length > 7) {
-            if (MemoryAccess.getByte(this) != MemoryAccess.getByte(that)) {
+            if ((byte) BYTE_HANDLE.get(this, 0) != (byte) BYTE_HANDLE.get(that, 0)) {
                 return 0;
             }
             i = vectorizedMismatchLargeForBytes(scope, that.scope,
-                    this.base(), this.min(),
-                    that.base(), that.min(),
+                    this.base(), this.min,
+                    that.base(), that.min,
                     length);
             if (i >= 0) {
                 return i;
@@ -164,7 +204,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
             i = length - remaining;
         }
         for (; i < length; i++) {
-            if (MemoryAccess.getByteAtOffset(this, i) != MemoryAccess.getByteAtOffset(that, i)) {
+            if ((byte) BYTE_HANDLE.get(this, i) != (byte) BYTE_HANDLE.get(that, i)) {
                 return i;
             }
         }
@@ -175,9 +215,9 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
      * Mismatch over long lengths.
      */
     private static long vectorizedMismatchLargeForBytes(MemoryScope aScope, MemoryScope bScope,
-                                                       Object a, long aOffset,
-                                                       Object b, long bOffset,
-                                                       long length) {
+                                                        Object a, long aOffset,
+                                                        Object b, long bOffset,
+                                                        long length) {
         long off = 0;
         long remaining = length;
         int i, size;
@@ -207,7 +247,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
     @ForceInline
     public final MemoryAddress address() {
         checkValidState();
-        return new MemoryAddressImpl(base(), min());
+        return new MemoryAddressImpl(base(), min);
     }
 
     @Override
@@ -216,7 +256,21 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
             throw unsupportedAccessMode(READ);
         }
         checkArraySize("ByteBuffer", 1);
-        ByteBuffer _bb = makeByteBuffer();
+        ByteBuffer _bb;
+        if (base != null) {
+            //heap
+            if (!(base instanceof byte[])) {
+                throw new UnsupportedOperationException("Not an address to an heap-allocated byte array");
+            }
+            JavaNioAccess nioAccess = SharedSecrets.getJavaNioAccess();
+            _bb = nioAccess.newHeapByteBuffer((byte[]) base, (int)min - BYTE_ARR_BASE, (int) byteSize(), this);
+        } else if (unmapper == null) {
+            // direct
+            _bb = nioAccess.newDirectByteBuffer(min, (int) this.length, null, this);
+        } else {
+            // mapped
+            _bb = nioAccess.newMappedByteBuffer(unmapper, min, (int)length, null, this);
+        }
         if (!isSet(WRITE)) {
             //scope is IMMUTABLE - obtain a RO byte buffer
             _bb = _bb.asReadOnlyBuffer();
@@ -245,12 +299,12 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
     }
 
     @Override
-    public AbstractMemorySegmentImpl withAccessModes(int accessModes) {
+    public MemorySegmentImpl withAccessModes(int accessModes) {
         checkAccessModes(accessModes);
         if ((~accessModes() & accessModes) != 0) {
             throw new IllegalArgumentException("Cannot acquire more access modes");
         }
-        return dup(0, length, (mask & ~ALL_ACCESS) | accessModes, scope);
+        return new MemorySegmentImpl(kind, min, base, unmapper, length, (mask & ~ALL_ACCESS) | accessModes, scope);
     }
 
     @Override
@@ -272,7 +326,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
             throw unsupportedAccessMode(HANDOFF);
         }
         try {
-            return dup(0L, length, mask, scope.confineTo(thread));
+            return new MemorySegmentImpl(kind, min, base, unmapper, length, mask, scope.confineTo(thread));
         } finally {
             //flush read/writes to segment memory before returning the new segment
             VarHandle.fullFence();
@@ -286,7 +340,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
             throw unsupportedAccessMode(SHARE);
         }
         try {
-            return dup(0L, length, mask, scope.share());
+            return new MemorySegmentImpl(kind, min, base, unmapper, length, mask, scope.share());
         } finally {
             //flush read/writes to segment memory before returning the new segment
             VarHandle.fullFence();
@@ -300,7 +354,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         if (!isSet(CLOSE)) {
             throw unsupportedAccessMode(CLOSE);
         }
-        return dup(0L, length, mask, scope.cleanable(cleaner));
+        return new MemorySegmentImpl(kind, min, base, unmapper, length, mask, scope.cleanable(cleaner));
     }
 
     @Override
@@ -310,11 +364,6 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
             throw unsupportedAccessMode(CLOSE);
         }
         scope.close();
-    }
-
-    @Override
-    public boolean isMapped() {
-        return false;
     }
 
     @Override
@@ -390,7 +439,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
 
     @Override
     public long unsafeGetOffset() {
-        return min();
+        return min;
     }
 
     @Override
@@ -467,21 +516,21 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
 
     private IndexOutOfBoundsException outOfBoundException(long offset, long length) {
         return new IndexOutOfBoundsException(String.format("Out of bound access on segment %s; new offset = %d; new length = %d",
-                        this, offset, length));
+                this, offset, length));
     }
 
     protected int id() {
         //compute a stable and random id for this memory segment
-        return Math.abs(Objects.hash(base(), min(), NONCE));
+        return Math.abs(Objects.hash(base(), min, NONCE));
     }
 
     static class SegmentSplitter implements Spliterator<MemorySegment> {
-        AbstractMemorySegmentImpl segment;
+        MemorySegmentImpl segment;
         long elemCount;
         final long elementSize;
         long currentIndex;
 
-        SegmentSplitter(long elementSize, long elemCount, AbstractMemorySegmentImpl segment) {
+        SegmentSplitter(long elementSize, long elemCount, MemorySegmentImpl segment) {
             this.segment = segment;
             this.elementSize = elementSize;
             this.elemCount = elemCount;
@@ -490,7 +539,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         @Override
         public SegmentSplitter trySplit() {
             if (currentIndex == 0 && elemCount > 1) {
-                AbstractMemorySegmentImpl parent = segment;
+                MemorySegmentImpl parent = segment;
                 long rem = elemCount % 2;
                 long split = elemCount / 2;
                 long lobound = split * elementSize;
@@ -507,7 +556,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         public boolean tryAdvance(Consumer<? super MemorySegment> action) {
             Objects.requireNonNull(action);
             if (currentIndex < elemCount) {
-                AbstractMemorySegmentImpl acquired = segment;
+                MemorySegmentImpl acquired = segment;
                 try {
                     action.accept(acquired.asSliceNoCheck(currentIndex * elementSize, elementSize));
                 } finally {
@@ -526,7 +575,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         public void forEachRemaining(Consumer<? super MemorySegment> action) {
             Objects.requireNonNull(action);
             if (currentIndex < elemCount) {
-                AbstractMemorySegmentImpl acquired = segment;
+                MemorySegmentImpl acquired = segment;
                 try {
                     if (acquired.isSmall()) {
                         int index = (int) currentIndex;
@@ -565,7 +614,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         return "MemorySegment{ id=0x" + Long.toHexString(id()) + " limit: " + length + " }";
     }
 
-    public static AbstractMemorySegmentImpl ofBuffer(ByteBuffer bb) {
+    public static MemorySegmentImpl ofBuffer(ByteBuffer bb) {
         long bbAddress = nioAccess.getBufferAddress(bb);
         Object base = nioAccess.getBufferBase(bb);
         UnmapperProxy unmapper = nioAccess.unmapper(bb);
@@ -574,7 +623,7 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         int limit = bb.limit();
         int size = limit - pos;
 
-        AbstractMemorySegmentImpl bufferSegment = (AbstractMemorySegmentImpl)nioAccess.bufferSegment(bb);
+        MemorySegmentImpl bufferSegment = (MemorySegmentImpl)nioAccess.bufferSegment(bb);
         final MemoryScope bufferScope;
         int modes;
         if (bufferSegment != null) {
@@ -587,12 +636,152 @@ public abstract class AbstractMemorySegmentImpl implements MemorySegment, Memory
         if (bb.isReadOnly()) {
             modes &= ~WRITE;
         }
-        if (base != null) {
-            return new HeapMemorySegmentImpl<>(bbAddress + pos, () -> (byte[])base, size, modes, bufferScope);
-        } else if (unmapper == null) {
-            return new NativeMemorySegmentImpl(bbAddress + pos, size, modes, bufferScope);
+        return new MemorySegmentImpl(base != null ? BYTE_KIND : NO_KIND, bbAddress + pos, base,
+                unmapper, size, modes, bufferScope);
+    }
+
+    // mapped segments support
+
+    public static void load(MemorySegment segment) {
+        MemorySegmentImpl segmentImpl = checkMappedSegment(segment);
+        SCOPED_MEMORY_ACCESS.load(segmentImpl.scope, segmentImpl.min, segmentImpl.unmapper.isSync(), segmentImpl.length);
+    }
+
+    public static void unload(MemorySegment segment) {
+        MemorySegmentImpl segmentImpl = checkMappedSegment(segment);
+        SCOPED_MEMORY_ACCESS.unload(segmentImpl.scope, segmentImpl.min, segmentImpl.unmapper.isSync(), segmentImpl.length);
+    }
+
+    public static boolean isLoaded(MemorySegment segment) {
+        MemorySegmentImpl segmentImpl = checkMappedSegment(segment);
+        return SCOPED_MEMORY_ACCESS.isLoaded(segmentImpl.scope, segmentImpl.min, segmentImpl.unmapper.isSync(), segmentImpl.length);
+    }
+
+    public static void force(MemorySegment segment) {
+        MemorySegmentImpl segmentImpl = checkMappedSegment(segment);
+        SCOPED_MEMORY_ACCESS.force(segmentImpl.scope, segmentImpl.unmapper.fileDescriptor(), segmentImpl.min, segmentImpl.unmapper.isSync(), 0, segmentImpl.length);
+    }
+
+    private static MemorySegmentImpl checkMappedSegment(MemorySegment segment) {
+        MemorySegmentImpl segmentImpl = (MemorySegmentImpl)segment;
+        if (segmentImpl.unmapper == null) {
+            throw new UnsupportedOperationException("Not a mapped memory segment");
+        }
+        return segmentImpl;
+    }
+
+    // factories
+
+    public static final MemorySegment EVERYTHING = makeNativeSegmentUnchecked(MemoryAddress.NULL, Long.MAX_VALUE, MemoryScope.DUMMY_CLEANUP_ACTION, null)
+            .share()
+            .withAccessModes(READ | WRITE);
+
+    private static final Unsafe unsafe = Unsafe.getUnsafe();
+
+    private static final int BYTE_ARR_BASE = unsafe.arrayBaseOffset(byte[].class);
+
+    // The maximum alignment supported by malloc - typically 16 on
+    // 64-bit platforms and 8 on 32-bit platforms.
+    private final static long MAX_MALLOC_ALIGN = Unsafe.ADDRESS_SIZE == 4 ? 8 : 16;
+
+    private static final boolean skipZeroMemory = GetBooleanAction.privilegedGetProperty("jdk.internal.foreign.skipZeroMemory");
+
+    public static MemorySegment makeNativeSegment(long bytesSize, long alignmentBytes) {
+        if (VM.isDirectMemoryPageAligned()) {
+            alignmentBytes = Math.max(alignmentBytes, nioAccess.pageSize());
+        }
+        long alignedSize = alignmentBytes > MAX_MALLOC_ALIGN ?
+                bytesSize + (alignmentBytes - 1) :
+                bytesSize;
+
+        nioAccess.reserveMemory(alignedSize, bytesSize);
+
+        long buf = unsafe.allocateMemory(alignedSize);
+        if (!skipZeroMemory) {
+            unsafe.setMemory(buf, alignedSize, (byte)0);
+        }
+        long alignedBuf = Utils.alignUp(buf, alignmentBytes);
+        MemoryScope scope = MemoryScope.createConfined(null, () -> {
+            unsafe.freeMemory(buf);
+            nioAccess.unreserveMemory(alignedSize, bytesSize);
+        }, null);
+        MemorySegment segment = new MemorySegmentImpl(NO_KIND, buf, null, null, alignedSize,
+                defaultAccessModes(alignedSize), scope);
+        if (alignedSize != bytesSize) {
+            long delta = alignedBuf - buf;
+            segment = segment.asSlice(delta, bytesSize);
+        }
+        return segment;
+    }
+
+    public static MemorySegment makeNativeSegmentUnchecked(MemoryAddress min, long bytesSize, Runnable cleanupAction, Object ref) {
+        return new MemorySegmentImpl(NO_KIND, min.toRawLongValue(), null, null, bytesSize, defaultAccessModes(bytesSize),
+                MemoryScope.createConfined(ref, cleanupAction == null ? MemoryScope.DUMMY_CLEANUP_ACTION : cleanupAction, null));
+    }
+
+    public static MemorySegment makeArraySegment(byte[] arr) {
+        return makeHeapSegment(BYTE_KIND, arr, arr.length,
+                Unsafe.ARRAY_BYTE_BASE_OFFSET, Unsafe.ARRAY_BYTE_INDEX_SCALE);
+    }
+
+    public static MemorySegment makeArraySegment(char[] arr) {
+        return makeHeapSegment(CHAR_KIND, arr, arr.length,
+                Unsafe.ARRAY_CHAR_BASE_OFFSET, Unsafe.ARRAY_CHAR_INDEX_SCALE);
+    }
+
+    public static MemorySegment makeArraySegment(short[] arr) {
+        return makeHeapSegment(SHORT_KIND, arr, arr.length,
+                Unsafe.ARRAY_SHORT_BASE_OFFSET, Unsafe.ARRAY_SHORT_INDEX_SCALE);
+    }
+
+    public static MemorySegment makeArraySegment(int[] arr) {
+        return makeHeapSegment(INT_KIND, arr, arr.length,
+                Unsafe.ARRAY_INT_BASE_OFFSET, Unsafe.ARRAY_INT_INDEX_SCALE);
+    }
+
+    public static MemorySegment makeArraySegment(long[] arr) {
+        return makeHeapSegment(LONG_KIND, arr, arr.length,
+                Unsafe.ARRAY_LONG_BASE_OFFSET, Unsafe.ARRAY_LONG_INDEX_SCALE);
+    }
+
+    public static MemorySegment makeArraySegment(float[] arr) {
+        return makeHeapSegment(FLOAT_KIND, arr, arr.length,
+                Unsafe.ARRAY_FLOAT_BASE_OFFSET, Unsafe.ARRAY_FLOAT_INDEX_SCALE);
+    }
+
+    public static MemorySegment makeArraySegment(double[] arr) {
+        return makeHeapSegment(DOUBLE_KIND, arr, arr.length,
+                Unsafe.ARRAY_DOUBLE_BASE_OFFSET, Unsafe.ARRAY_DOUBLE_INDEX_SCALE);
+    }
+
+    static <Z> MemorySegment makeHeapSegment(byte kind, Z obj, int length, int base, int scale) {
+        int byteSize = length * scale;
+        MemoryScope scope = MemoryScope.createConfined(null, MemoryScope.DUMMY_CLEANUP_ACTION, null);
+        return new MemorySegmentImpl(kind, base, obj, null, byteSize, defaultAccessModes(byteSize), scope);
+    }
+
+    public static MemorySegment makeMappedSegment(Path path, long bytesOffset, long bytesSize, FileChannel.MapMode mapMode) throws IOException {
+        if (bytesSize < 0) throw new IllegalArgumentException("Requested bytes size must be >= 0.");
+        if (bytesOffset < 0) throw new IllegalArgumentException("Requested bytes offset must be >= 0.");
+        try (FileChannelImpl channelImpl = (FileChannelImpl)FileChannel.open(path, openOptions(mapMode))) {
+            UnmapperProxy unmapperProxy = channelImpl.mapInternal(mapMode, bytesOffset, bytesSize);
+            MemoryScope scope = MemoryScope.createConfined(null, unmapperProxy::unmap, null);
+            int modes = MemorySegmentImpl.defaultAccessModes(bytesSize);
+            if (mapMode == FileChannel.MapMode.READ_ONLY) {
+                modes &= ~WRITE;
+            }
+            return new MemorySegmentImpl(NO_KIND, unmapperProxy.address(), null, unmapperProxy, bytesSize,
+                    modes, scope);
+        }
+    }
+
+    private static OpenOption[] openOptions(FileChannel.MapMode mapMode) {
+        if (mapMode == FileChannel.MapMode.READ_ONLY) {
+            return new OpenOption[] { StandardOpenOption.READ };
+        } else if (mapMode == FileChannel.MapMode.READ_WRITE || mapMode == FileChannel.MapMode.PRIVATE) {
+            return new OpenOption[] { StandardOpenOption.READ, StandardOpenOption.WRITE };
         } else {
-            return new MappedMemorySegmentImpl(bbAddress + pos, unmapper, size, modes, bufferScope);
+            throw new UnsupportedOperationException("Unsupported map mode: " + mapMode);
         }
     }
 }
