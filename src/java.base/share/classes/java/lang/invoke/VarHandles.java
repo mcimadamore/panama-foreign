@@ -449,20 +449,20 @@ final class VarHandles {
             ));
         } else if (carrier == float.class) {
             return maybeAdapt(guardWithTest(BYTES_SEGMENT_TEST,
-                    new MemoryAccessVarHandleByteBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleFloatBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
                     guardWithTest(CHARS_SEGMENT_TEST,
-                            new MemoryAccessVarHandleByteCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                            new MemoryAccessVarHandleFloatCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
                             guardWithTest(SHORTS_SEGMENT_TEST,
-                                    new MemoryAccessVarHandleByteShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                                    new MemoryAccessVarHandleFloatShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
                                     guardWithTest(INTS_SEGMENT_TEST,
-                                            new MemoryAccessVarHandleByteIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                                            new MemoryAccessVarHandleFloatIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
                                             guardWithTest(LONGS_SEGMENT_TEST,
-                                                    new MemoryAccessVarHandleByteLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                                                    new MemoryAccessVarHandleFloatLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
                                                     guardWithTest(FLOATS_SEGMENT_TEST,
-                                                            new MemoryAccessVarHandleByteFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                                                            new MemoryAccessVarHandleFloatFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
                                                             guardWithTest(DOUBLES_SEGMENT_TEST,
-                                                                    new MemoryAccessVarHandleByteDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                                    new MemoryAccessVarHandleByteHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
+                                                                    new MemoryAccessVarHandleFloatDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                                                                    new MemoryAccessVarHandleFloatHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
                                                             )
                                                     )
                                             )
