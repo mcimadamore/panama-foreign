@@ -13,11 +13,7 @@
             if (scope != null) {
                 scope.checkValidState();
             }
-            if (base == null) {
-                return UNSAFE.get$Type$(null, offset);
-            } else {
-                return UNSAFE.get$Type$(base, offset);
-            }
+            return UNSAFE.get$Type$(base, offset);
         } finally {
             Reference.reachabilityFence(scope);
         }
@@ -38,11 +34,7 @@
             if (scope != null) {
                 scope.checkValidState();
             }
-            if (base == null) {
-                UNSAFE.put$Type$(null, offset, value);
-            } else {
-                UNSAFE.put$Type$(base, offset, value);
-            }
+            UNSAFE.put$Type$(base, offset, value);
         } finally {
             Reference.reachabilityFence(scope);
         }
@@ -64,11 +56,7 @@
             if (scope != null) {
                 scope.checkValidState();
             }
-            if (base == null) {
-                return UNSAFE.get$Type$Unaligned(null, offset, be);
-            } else {
-                return UNSAFE.get$Type$Unaligned(base, offset, be);
-            }
+            return UNSAFE.get$Type$Unaligned(base, offset, be);
         } finally {
             Reference.reachabilityFence(scope);
         }
@@ -89,11 +77,7 @@
             if (scope != null) {
                 scope.checkValidState();
             }
-            if (base == null) {
-                UNSAFE.put$Type$Unaligned(null, offset, value, be);
-            } else {
-                UNSAFE.put$Type$Unaligned(base, offset, value, be);
-            }
+            UNSAFE.put$Type$Unaligned(base, offset, value, be);
         } finally {
             Reference.reachabilityFence(scope);
         }
