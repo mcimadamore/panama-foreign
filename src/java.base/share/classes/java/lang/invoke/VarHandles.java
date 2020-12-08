@@ -25,6 +25,7 @@
 
 package java.lang.invoke;
 
+import jdk.internal.access.foreign.MemorySegmentProxy;
 import sun.invoke.util.Wrapper;
 
 import java.lang.reflect.Constructor;
@@ -49,6 +50,17 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 final class VarHandles {
+
+    static final MethodHandle HEAP_SEGMENT_TEST;
+
+    static {
+        try {
+            HEAP_SEGMENT_TEST =
+                    MethodHandles.lookup().findStatic(VarHandles.class, "isHeapSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
+        } catch (Throwable ex) {
+            throw new ExceptionInInitializerError(ex);
+        }
+    }
 
     static ClassValue<ConcurrentMap<Integer, MethodHandle>> ADDRESS_FACTORIES = new ClassValue<>() {
         @Override
@@ -330,22 +342,40 @@ final class VarHandles {
         boolean exact = false;
 
         if (carrier == byte.class) {
-            return maybeAdapt(new MemoryAccessVarHandleByteHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact));
+            return maybeAdapt(guardWithTest(HEAP_SEGMENT_TEST,
+                    new MemoryAccessVarHandleByteHeapHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleByteHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == char.class) {
-            return maybeAdapt(new MemoryAccessVarHandleCharHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact));
+            return maybeAdapt(guardWithTest(HEAP_SEGMENT_TEST,
+                    new MemoryAccessVarHandleCharHeapHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleCharHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == short.class) {
-            return maybeAdapt(new MemoryAccessVarHandleShortHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact));
+            return maybeAdapt(guardWithTest(HEAP_SEGMENT_TEST,
+                    new MemoryAccessVarHandleShortHeapHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleShortHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == int.class) {
-            return maybeAdapt(new MemoryAccessVarHandleIntHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact));
+            return maybeAdapt(guardWithTest(HEAP_SEGMENT_TEST,
+                    new MemoryAccessVarHandleIntHeapHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleIntHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == float.class) {
-            return maybeAdapt(new MemoryAccessVarHandleFloatHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact));
+            return maybeAdapt(guardWithTest(HEAP_SEGMENT_TEST,
+                    new MemoryAccessVarHandleFloatHeapHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleFloatHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == long.class) {
-            return maybeAdapt(new MemoryAccessVarHandleLongHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact));
+            return maybeAdapt(guardWithTest(HEAP_SEGMENT_TEST,
+                    new MemoryAccessVarHandleLongHeapHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleLongHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == double.class) {
-            return maybeAdapt(new MemoryAccessVarHandleDoubleHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact));
+            return maybeAdapt(guardWithTest(HEAP_SEGMENT_TEST,
+                    new MemoryAccessVarHandleDoubleHeapHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleDoubleHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else {
             throw new IllegalStateException("Cannot get here");
         }
+    }
+
+    private static boolean isHeapSegment(MemorySegmentProxy segmentProxy) {
+        return segmentProxy.unsafeGetBase() != null;
     }
 
     private static VarHandle maybeAdapt(VarHandle target) {
@@ -647,6 +677,37 @@ final class VarHandles {
         return Throwable.class.isAssignableFrom(clazz) &&
                 !RuntimeException.class.isAssignableFrom(clazz) &&
                 !Error.class.isAssignableFrom(clazz);
+    }
+
+    public static VarHandle guardWithTest(MethodHandle test,
+                                          VarHandle target,
+                                          VarHandle fallback) {
+        Objects.nonNull(test);
+        Objects.nonNull(target);
+        Objects.nonNull(fallback);
+
+        if (!target.coordinateTypes().equals(fallback.coordinateTypes())) {
+            throw newIllegalArgumentException("target and fallback have different coordinate types", target, fallback);
+        }
+        if (!target.varType().equals(fallback.varType())) {
+            throw newIllegalArgumentException("target and fallback have different types", target, fallback);
+        }
+        MethodType testType = test.type();
+        if (testType.returnType() != boolean.class) {
+            throw newIllegalArgumentException("guard type is not a predicate ", test);
+        }
+        if (testType.parameterCount() > target.coordinateTypes().size()) {
+            throw newIllegalArgumentException("test type parameter count should be <= target/fallback coordinates", test);
+        }
+        for (int i = 0 ; i < testType.parameterCount() ; i++) {
+            if (!testType.parameterType(i).equals(target.coordinateTypes().get(i))) {
+                throw newIllegalArgumentException("test type should have same parameter types as target/fallback coordinates types", test);
+            }
+        }
+
+        return new IndirectVarHandle(target, target.varType(), target.coordinateTypes().toArray(new Class<?>[0]),
+                (mode, modeHandle) -> MethodHandles.guardWithTest(MethodHandles.dropArguments(test, 0, VarHandle.class),
+                        target.getMethodHandle(mode.ordinal()), fallback.getMethodHandle(mode.ordinal())));
     }
 
 //    /**

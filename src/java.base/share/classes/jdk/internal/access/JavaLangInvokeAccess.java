@@ -123,6 +123,12 @@ public interface JavaLangInvokeAccess {
     VarHandle insertCoordinates(VarHandle target, int pos, Object... values);
 
     /**
+     * Var handle test with guard
+     * Used by {@code jdk.incubator.foreign.MemoryHandles}.
+     */
+    VarHandle guardWithTest(MethodHandle test, VarHandle target, VarHandle fallback);
+
+    /**
      * Returns a native method handle with given arguments as fallback and steering info.
      *
      * Will allow JIT to intrinsify.

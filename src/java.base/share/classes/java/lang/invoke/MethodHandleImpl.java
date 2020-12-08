@@ -1809,6 +1809,11 @@ abstract class MethodHandleImpl {
             public VarHandle insertCoordinates(VarHandle target, int pos, Object... values) {
                 return VarHandles.insertCoordinates(target, pos, values);
             }
+
+            @Override
+            public VarHandle guardWithTest(MethodHandle test, VarHandle target, VarHandle fallback) {
+                return VarHandles.guardWithTest(test, target, fallback);
+            }
         });
     }
 
