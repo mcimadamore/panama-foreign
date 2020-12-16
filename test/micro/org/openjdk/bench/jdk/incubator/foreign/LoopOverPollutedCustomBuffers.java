@@ -25,7 +25,9 @@
 
 package org.openjdk.bench.jdk.incubator.foreign;
 
-import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.util.concurrent.TimeUnit;
 
 import jdk.incubator.foreign.MemoryAccess;
@@ -42,6 +44,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
+import sun.misc.Unsafe;
 
 @Fork(value = 1)
 @BenchmarkMode(Mode.AverageTime)
@@ -57,24 +60,29 @@ public class LoopOverPollutedCustomBuffers {
 
     private CustomFloatBuffer nativeBuffer;
 
-    @Param({ "0", "1", "2" })
-    int pollute;
+    @Param({ "false", "true" })
+    boolean pollute;
+
+    @Param({ "false", "true" })
+    boolean nio;
+
+    static final Unsafe unsafe = Utils.unsafe;
 
     @Setup
     public void setUp() {
         int numPixels = WIDTH * HEIGHT;
-        nativeBuffer = CustomFloatBuffer.of(NUM_ELEMS);
-        CustomFloatBuffer heapBufferFloats = CustomFloatBuffer.of(new float[numPixels]);
-        CustomFloatBuffer heapBufferInts = CustomFloatBuffer.of(new int[numPixels]);
+        nativeBuffer = nio ?
+                CustomFloatBufferNIO.of(NUM_ELEMS) :
+                CustomFloatBufferSegment.of(NUM_ELEMS);
+        CustomFloatBuffer heapBufferBytes = nio ?
+                CustomFloatBufferNIO.of(new byte[numPixels * 4]) :
+                CustomFloatBufferSegment.of(new byte[numPixels * 4]);
         float f = 0;
         for (int i = 0; i < WIDTH; ++i) {
             for (int j = 0; j < HEIGHT; ++j) {
                 nativeBuffer.setFloat(i * j, i + j);
-                if (pollute > 0) {
-                    f += heapBufferFloats.getFloat(i * j);
-                }
-                if (pollute > 1) {
-                    f += heapBufferInts.getFloat(i * j);
+                if (pollute) {
+                    f += heapBufferBytes.getFloat(i * j);
                 }
             }
         }
@@ -105,35 +113,73 @@ public class LoopOverPollutedCustomBuffers {
         return v;
     }
 
-    static class CustomFloatBuffer {
+    interface CustomFloatBuffer {
+        float getFloat(long index);
+        void setFloat(long index, float value);
+        void close();
+    }
+
+    static class CustomFloatBufferSegment implements CustomFloatBuffer {
         final MemorySegment segment;
 
-        CustomFloatBuffer(MemorySegment segment) {
+        CustomFloatBufferSegment(MemorySegment segment) {
             this.segment = segment;
         }
 
-        float getFloat(long index) {
+        @Override
+        public float getFloat(long index) {
             return MemoryAccess.getFloatAtIndex(segment, index);
         }
 
-        void setFloat(long index, float value) {
+        @Override
+        public void setFloat(long index, float value) {
             MemoryAccess.setFloatAtIndex(segment, index, value);
         }
 
         static CustomFloatBuffer of(int size) {
-            return new CustomFloatBuffer(MemorySegment.allocateNative(4 * size, 4));
+            return new CustomFloatBufferSegment(MemorySegment.allocateNative(4 * size, 4));
         }
 
-        static CustomFloatBuffer of(float[] array) {
-            return new CustomFloatBuffer(MemorySegment.ofArray(array));
+        static CustomFloatBuffer of(byte[] array) {
+            return new CustomFloatBufferSegment(MemorySegment.ofArray(array));
         }
 
-        static CustomFloatBuffer of(int[] array) {
-            return new CustomFloatBuffer(MemorySegment.ofArray(array));
-        }
-
-        void close() {
+        public void close() {
             segment.close();
+        }
+    }
+
+    static class CustomFloatBufferNIO implements CustomFloatBuffer {
+        final FloatBuffer fb;
+        final ByteBuffer bb;
+
+        CustomFloatBufferNIO(ByteBuffer bb, FloatBuffer fb) {
+            this.bb = bb;
+            this.fb = fb;
+        }
+
+        @Override
+        public float getFloat(long index) {
+            return fb.get((int)index);
+        }
+
+        @Override
+        public void setFloat(long index, float value) {
+            fb.put((int)index, value);
+        }
+
+        static CustomFloatBuffer of(int size) {
+            ByteBuffer bb = ByteBuffer.allocateDirect(4 * size);
+            return new CustomFloatBufferNIO(bb, bb.order(ByteOrder.nativeOrder()).asFloatBuffer());
+        }
+
+        static CustomFloatBuffer of(byte[] array) {
+            ByteBuffer bb = ByteBuffer.wrap(array);
+            return new CustomFloatBufferNIO(bb, bb.order(ByteOrder.nativeOrder()).asFloatBuffer());
+        }
+
+        public void close() {
+            unsafe.invokeCleaner(bb);
         }
     }
 }
