@@ -60,7 +60,7 @@ import java.util.function.IntFunction;
  * segment is either in an invalid state (e.g. it has already been closed) or if access occurs from a thread other
  * than the owner thread. See {@link MemoryScope} for more details on management of temporal bounds.
  */
-public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
+public class MemorySegmentImpl extends MemorySegmentProxy implements MemorySegment {
 
     private static final ScopedMemoryAccess SCOPED_MEMORY_ACCESS = ScopedMemoryAccess.getScopedMemoryAccess();
 
@@ -146,6 +146,7 @@ public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
 
     @Override
     public Spliterator<MemorySegment> spliterator(SequenceLayout sequenceLayout) {
+        Objects.requireNonNull(sequenceLayout);
         checkValidState();
         if (sequenceLayout.byteSize() != byteSize()) {
             throw new IllegalArgumentException();
@@ -162,7 +163,7 @@ public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
     }
 
     public void copyFrom(MemorySegment src) {
-        MemorySegmentImpl that = (MemorySegmentImpl)src;
+        MemorySegmentImpl that = (MemorySegmentImpl)Objects.requireNonNull(src);
         long size = that.byteSize();
         checkAccess(0, size, false);
         that.checkAccess(0, size, true);
@@ -171,12 +172,19 @@ public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
                 base(), min, size);
     }
 
-    private final static VarHandle BYTE_HANDLE = MemoryLayout.ofSequence(MemoryLayouts.JAVA_BYTE)
-            .varHandle(byte.class, MemoryLayout.PathElement.sequenceElement());
+    public void copyFromSwap(MemorySegment src, long elemSize) {
+        MemorySegmentImpl that = (MemorySegmentImpl)src;
+        long size = that.byteSize();
+        checkAccess(0, size, false);
+        that.checkAccess(0, size, true);
+        SCOPED_MEMORY_ACCESS.copySwapMemory(scope, that.scope,
+                        that.base(), that.min,
+                        base(), min, size, elemSize);
+    }
 
     @Override
     public long mismatch(MemorySegment other) {
-        MemorySegmentImpl that = (MemorySegmentImpl)other;
+        MemorySegmentImpl that = (MemorySegmentImpl)Objects.requireNonNull(other);
         final long thisSize = this.byteSize();
         final long thatSize = that.byteSize();
         final long length = Math.min(thisSize, thatSize);
@@ -189,7 +197,7 @@ public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
 
         long i = 0;
         if (length > 7) {
-            if ((byte) BYTE_HANDLE.get(this, 0) != (byte) BYTE_HANDLE.get(that, 0)) {
+            if (MemoryAccess.getByte(this) != MemoryAccess.getByte(that)) {
                 return 0;
             }
             i = vectorizedMismatchLargeForBytes(scope, that.scope,
@@ -204,7 +212,7 @@ public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
             i = length - remaining;
         }
         for (; i < length; i++) {
-            if ((byte) BYTE_HANDLE.get(this, i) != (byte) BYTE_HANDLE.get(that, i)) {
+            if (MemoryAccess.getByteAtOffset(this, i) != MemoryAccess.getByteAtOffset(that, i)) {
                 return i;
             }
         }
@@ -215,9 +223,9 @@ public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
      * Mismatch over long lengths.
      */
     private static long vectorizedMismatchLargeForBytes(MemoryScope aScope, MemoryScope bScope,
-                                                        Object a, long aOffset,
-                                                        Object b, long bOffset,
-                                                        long length) {
+                                                       Object a, long aOffset,
+                                                       Object b, long bOffset,
+                                                       long length) {
         long off = 0;
         long remaining = length;
         int i, size;
@@ -345,6 +353,21 @@ public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
             //flush read/writes to segment memory before returning the new segment
             VarHandle.fullFence();
         }
+    }
+
+    @Override
+    public MemorySegment handoff(NativeScope scope) {
+        Objects.requireNonNull(scope);
+        checkValidState();
+        if (!isSet(HANDOFF)) {
+            throw unsupportedAccessMode(HANDOFF);
+        }
+        if (!isSet(CLOSE)) {
+            throw unsupportedAccessMode(CLOSE);
+        }
+        MemorySegment dup = handoff(scope.ownerThread());
+        ((AbstractNativeScope)scope).register(dup);
+        return dup.withAccessModes(accessModes() & (READ | WRITE));
     }
 
     @Override
@@ -755,12 +778,15 @@ public class MemorySegmentImpl implements MemorySegment, MemorySegmentProxy {
     }
 
     static <Z> MemorySegment makeHeapSegment(byte kind, Z obj, int length, int base, int scale) {
-        int byteSize = length * scale;
+        Objects.requireNonNull(obj);
+        long byteSize = (long)length * scale;
         MemoryScope scope = MemoryScope.createConfined(null, MemoryScope.DUMMY_CLEANUP_ACTION, null);
         return new MemorySegmentImpl(kind, base, obj, null, byteSize, defaultAccessModes(byteSize), scope);
     }
 
     public static MemorySegment makeMappedSegment(Path path, long bytesOffset, long bytesSize, FileChannel.MapMode mapMode) throws IOException {
+        Objects.requireNonNull(path);
+        Objects.requireNonNull(mapMode);
         if (bytesSize < 0) throw new IllegalArgumentException("Requested bytes size must be >= 0.");
         if (bytesOffset < 0) throw new IllegalArgumentException("Requested bytes offset must be >= 0.");
         try (FileChannelImpl channelImpl = (FileChannelImpl)FileChannel.open(path, openOptions(mapMode))) {

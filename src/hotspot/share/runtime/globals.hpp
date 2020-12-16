@@ -25,7 +25,7 @@
 #ifndef SHARE_RUNTIME_GLOBALS_HPP
 #define SHARE_RUNTIME_GLOBALS_HPP
 
-#include "compiler/compiler_globals.hpp"
+#include "compiler/compiler_globals_pd.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "runtime/globals_shared.hpp"
 #include "utilities/align.hpp"
@@ -196,10 +196,6 @@ const intx ObjectAlignmentInBytes = 8;
                                                                             \
   develop(bool, LargePagesIndividualAllocationInjectError, false,           \
           "Fail large pages individual allocation")                         \
-                                                                            \
-  product(bool, UseLargePagesInMetaspace, false,                            \
-          "(Deprecated) Use large page memory in metaspace. "               \
-          "Only used if UseLargePages is enabled.")                         \
                                                                             \
   product(bool, UseNUMA, false,                                             \
           "Use NUMA if available")                                          \
@@ -855,13 +851,13 @@ const intx ObjectAlignmentInBytes = 8;
           range(500, max_intx)                                              \
           constraint(BiasedLockingDecayTimeFunc,AfterErgo)                  \
                                                                             \
-  product(intx, DiagnoseSyncOnPrimitiveWrappers, 0, DIAGNOSTIC,             \
+  product(intx, DiagnoseSyncOnValueBasedClasses, 0, DIAGNOSTIC,             \
              "Detect and take action upon identifying synchronization on "  \
-             "primitive wrappers. Modes: "                                  \
+             "value based classes. Modes: "                                 \
              "0: off; "                                                     \
              "1: exit with fatal error; "                                   \
              "2: log message to stdout. Output file can be specified with " \
-             "   -Xlog:primitivewrappers. If JFR is running it will "       \
+             "   -Xlog:valuebasedclasses. If JFR is running it will "       \
              "   also generate JFR events.")                                \
              range(0, 2)                                                    \
                                                                             \
@@ -946,11 +942,6 @@ const intx ObjectAlignmentInBytes = 8;
   product(bool, IgnoreEmptyClassPaths, false,                               \
           "Ignore empty path elements in -classpath")                       \
                                                                             \
-  product(size_t, InitialBootClassLoaderMetaspaceSize,                      \
-          NOT_LP64(2200*K) LP64_ONLY(4*M),                                  \
-          "(Deprecated) Initial size of the boot class loader data metaspace") \
-          range(30*K, max_uintx/BytesPerWord)                               \
-                                                                            \
   product(bool, PrintHeapAtSIGBREAK, true,                                  \
           "Print heap layout in response to SIGBREAK")                      \
                                                                             \
@@ -963,9 +954,6 @@ const intx ObjectAlignmentInBytes = 8;
           range(0.0, 100.0)                                                 \
                                                                             \
   /* JVMTI heap profiling */                                                \
-                                                                            \
-  product(bool, TraceJVMTIObjectTagging, false, DIAGNOSTIC,                 \
-          "Trace JVMTI object tagging calls")                               \
                                                                             \
   product(bool, VerifyBeforeIteration, false, DIAGNOSTIC,                   \
           "Verify memory system before JVMTI iteration")                    \
@@ -2499,29 +2487,18 @@ const intx ObjectAlignmentInBytes = 8;
                 "Allow allocating fields in empty slots of super-classes")  \
                                                                             \
   product(bool, DeoptimizeNMethodBarriersALot, false, DIAGNOSTIC,           \
-                "Make nmethod barriers deoptimise a lot.")
+                "Make nmethod barriers deoptimise a lot.")                  \
+                                                                            \
+  develop(bool, VerifyCrossModifyFence,                                     \
+          false AARCH64_ONLY(DEBUG_ONLY(||true)),                           \
+             "Mark all threads after a safepoint, and clear on a modify "   \
+             "fence. Add cleanliness checks.")                              \
 
 // end of RUNTIME_FLAGS
 
-// Interface macros
-#define DECLARE_PRODUCT_FLAG(type, name, value, ...)      extern "C" type name;
-#define DECLARE_PD_PRODUCT_FLAG(type, name, ...)          extern "C" type name;
-#ifdef PRODUCT
-#define DECLARE_DEVELOPER_FLAG(type, name, value, ...)    const type name = value;
-#define DECLARE_PD_DEVELOPER_FLAG(type, name, ...)        const type name = pd_##name;
-#define DECLARE_NOTPRODUCT_FLAG(type, name, value, ...)   const type name = value;
-#else
-#define DECLARE_DEVELOPER_FLAG(type, name, value, ...)    extern "C" type name;
-#define DECLARE_PD_DEVELOPER_FLAG(type, name, ...)        extern "C" type name;
-#define DECLARE_NOTPRODUCT_FLAG(type, name, value, ...)   extern "C" type name;
-#endif // PRODUCT
-
-ALL_FLAGS(DECLARE_DEVELOPER_FLAG,
-          DECLARE_PD_DEVELOPER_FLAG,
-          DECLARE_PRODUCT_FLAG,
-          DECLARE_PD_PRODUCT_FLAG,
-          DECLARE_NOTPRODUCT_FLAG,
-          IGNORE_RANGE,
-          IGNORE_CONSTRAINT)
+DECLARE_FLAGS(LP64_RUNTIME_FLAGS)
+DECLARE_ARCH_FLAGS(ARCH_FLAGS)
+DECLARE_FLAGS(RUNTIME_FLAGS)
+DECLARE_FLAGS(RUNTIME_OS_FLAGS)
 
 #endif // SHARE_RUNTIME_GLOBALS_HPP
