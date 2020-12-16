@@ -64,7 +64,7 @@ public class LoopOverPollutedCustomBuffers {
         int numPixels = WIDTH * HEIGHT;
         nativeBuffer = CustomFloatBuffer.of(NUM_ELEMS);
         CustomFloatBuffer heapBufferFloats = CustomFloatBuffer.of(new float[numPixels]);
-        CustomFloatBuffer heapBufferInts = CustomFloatBuffer.of(new float[numPixels]);
+        CustomFloatBuffer heapBufferInts = CustomFloatBuffer.of(new int[numPixels]);
         float f = 0;
         for (int i = 0; i < WIDTH; ++i) {
             for (int j = 0; j < HEIGHT; ++j) {
