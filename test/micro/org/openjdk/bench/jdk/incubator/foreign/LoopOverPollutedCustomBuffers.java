@@ -42,7 +42,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 
-@Fork(value = 3)
+@Fork(value = 1)
 @BenchmarkMode(Mode.AverageTime)
 @Warmup(iterations = 3, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
@@ -56,20 +56,24 @@ public class LoopOverPollutedCustomBuffers {
 
     private CustomFloatBuffer nativeBuffer;
 
-    @Param({ "true", "false" })
-    boolean pollute;
+    @Param({ "0", "1", "2" })
+    int pollute;
 
     @Setup
     public void setUp() {
         int numPixels = WIDTH * HEIGHT;
         nativeBuffer = CustomFloatBuffer.of(NUM_ELEMS);
-        CustomFloatBuffer heapBuffer = CustomFloatBuffer.of(new float[numPixels]);
+        CustomFloatBuffer heapBufferFloats = CustomFloatBuffer.of(new float[numPixels]);
+        CustomFloatBuffer heapBufferInts = CustomFloatBuffer.of(new float[numPixels]);
         float f = 0;
         for (int i = 0; i < WIDTH; ++i) {
             for (int j = 0; j < HEIGHT; ++j) {
-                nativeBuffer.setFloat(i + j, i * j);
-                if (pollute) {
-                    f += heapBuffer.getFloat(i * j);
+                nativeBuffer.setFloat(i * j, i + j);
+                if (pollute > 0) {
+                    f += heapBufferFloats.getFloat(i * j);
+                }
+                if (pollute > 1) {
+                    f += heapBufferInts.getFloat(i * j);
                 }
             }
         }
@@ -115,6 +119,10 @@ public class LoopOverPollutedCustomBuffers {
         }
 
         static CustomFloatBuffer of(float[] array) {
+            return new CustomFloatBuffer(MemorySegment.ofArray(array));
+        }
+
+        static CustomFloatBuffer of(int[] array) {
             return new CustomFloatBuffer(MemorySegment.ofArray(array));
         }
     }
