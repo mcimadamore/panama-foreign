@@ -40,6 +40,7 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 @Fork(value = 1)
@@ -77,6 +78,11 @@ public class LoopOverPollutedCustomBuffers {
                 }
             }
         }
+    }
+
+    @TearDown
+    public void tearDown() {
+        nativeBuffer.close();
     }
 
     @Benchmark
@@ -124,6 +130,10 @@ public class LoopOverPollutedCustomBuffers {
 
         static CustomFloatBuffer of(int[] array) {
             return new CustomFloatBuffer(MemorySegment.ofArray(array));
+        }
+
+        void close() {
+            segment.close();
         }
     }
 }
