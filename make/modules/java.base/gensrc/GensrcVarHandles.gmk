@@ -281,30 +281,10 @@ $(foreach t, $(VARHANDLES_MEMORY_ADDRESS_TYPES), \
 
 # List the types to generate source for, with capitalized first letter
 $(foreach t, $(VARHANDLES_MEMORY_ADDRESS_TYPES), \
-  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_BYTES_$t,$t,BytesHelper)))
+  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_BYTES_$t,$t,DirectHelper)))
 
 # List the types to generate source for, with capitalized first letter
 $(foreach t, $(VARHANDLES_MEMORY_ADDRESS_TYPES), \
-  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_CHARS_$t,$t,CharsHelper)))
-
-# List the types to generate source for, with capitalized first letter
-$(foreach t, $(VARHANDLES_MEMORY_ADDRESS_TYPES), \
-  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_SHORTS_$t,$t,ShortsHelper)))
-
-# List the types to generate source for, with capitalized first letter
-$(foreach t, $(VARHANDLES_MEMORY_ADDRESS_TYPES), \
-  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_INTS_$t,$t,IntsHelper)))
-
-# List the types to generate source for, with capitalized first letter
-$(foreach t, $(VARHANDLES_MEMORY_ADDRESS_TYPES), \
-  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_LONGS_$t,$t,LongsHelper)))
-
-# List the types to generate source for, with capitalized first letter
-$(foreach t, $(VARHANDLES_MEMORY_ADDRESS_TYPES), \
-  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_FLOATS_$t,$t,FloatsHelper)))
-
-# List the types to generate source for, with capitalized first letter
-$(foreach t, $(VARHANDLES_MEMORY_ADDRESS_TYPES), \
-  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_DOUBLES_$t,$t,DoublesHelper)))
+  $(eval $(call GenerateVarHandleMemoryAccess,VAR_HANDLE_MEMORY_ADDRESS_CHARS_$t,$t,BytesHelper)))
 
 TARGETS += $(GENSRC_VARHANDLES)

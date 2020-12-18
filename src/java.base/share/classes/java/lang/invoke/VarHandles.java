@@ -47,30 +47,12 @@ import static java.util.stream.Collectors.joining;
 
 final class VarHandles {
 
-    static final MethodHandle BYTES_SEGMENT_TEST;
-    static final MethodHandle CHARS_SEGMENT_TEST;
-    static final MethodHandle SHORTS_SEGMENT_TEST;
-    static final MethodHandle INTS_SEGMENT_TEST;
-    static final MethodHandle LONGS_SEGMENT_TEST;
-    static final MethodHandle FLOATS_SEGMENT_TEST;
-    static final MethodHandle DOUBLES_SEGMENT_TEST;
+    static final MethodHandle DIRECT_SEGMENT_TEST;;
 
     static {
         try {
-            BYTES_SEGMENT_TEST =
-                    MethodHandles.lookup().findStatic(VarHandles.class, "isBytesSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
-            CHARS_SEGMENT_TEST =
-                    MethodHandles.lookup().findStatic(VarHandles.class, "isCharsSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
-            SHORTS_SEGMENT_TEST =
-                    MethodHandles.lookup().findStatic(VarHandles.class, "isShortsSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
-            INTS_SEGMENT_TEST =
-                    MethodHandles.lookup().findStatic(VarHandles.class, "isIntsSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
-            LONGS_SEGMENT_TEST =
-                    MethodHandles.lookup().findStatic(VarHandles.class, "isLongsSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
-            FLOATS_SEGMENT_TEST =
-                    MethodHandles.lookup().findStatic(VarHandles.class, "isFloatsSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
-            DOUBLES_SEGMENT_TEST =
-                    MethodHandles.lookup().findStatic(VarHandles.class, "isDoublesSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
+            DIRECT_SEGMENT_TEST =
+                    MethodHandles.lookup().findStatic(VarHandles.class, "isDirectSegment", MethodType.methodType(boolean.class, MemorySegmentProxy.class));
         } catch (Throwable ex) {
             throw new ExceptionInInitializerError(ex);
         }
@@ -356,197 +338,40 @@ final class VarHandles {
         boolean exact = false;
 
         if (carrier == byte.class) {
-            return maybeAdapt(guardWithTest(BYTES_SEGMENT_TEST,
-                    new MemoryAccessVarHandleByteBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                    guardWithTest(CHARS_SEGMENT_TEST,
-                            new MemoryAccessVarHandleByteCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                            guardWithTest(SHORTS_SEGMENT_TEST,
-                                    new MemoryAccessVarHandleByteShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                    guardWithTest(INTS_SEGMENT_TEST,
-                                            new MemoryAccessVarHandleByteIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                            guardWithTest(LONGS_SEGMENT_TEST,
-                                                    new MemoryAccessVarHandleByteLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                    guardWithTest(FLOATS_SEGMENT_TEST,
-                                                            new MemoryAccessVarHandleByteFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                            guardWithTest(DOUBLES_SEGMENT_TEST,
-                                                                    new MemoryAccessVarHandleByteDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                                    new MemoryAccessVarHandleByteHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
-                                                            )
-                                                    )
-                                            )
-                                    )
-                            )
-                    )
-            ));
+            return maybeAdapt(guardWithTest(DIRECT_SEGMENT_TEST,
+                    new MemoryAccessVarHandleByteDirectHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleByteBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == char.class) {
-            return maybeAdapt(guardWithTest(BYTES_SEGMENT_TEST,
-                    new MemoryAccessVarHandleCharBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                    guardWithTest(CHARS_SEGMENT_TEST,
-                            new MemoryAccessVarHandleCharCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                            guardWithTest(SHORTS_SEGMENT_TEST,
-                                    new MemoryAccessVarHandleCharShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                    guardWithTest(INTS_SEGMENT_TEST,
-                                            new MemoryAccessVarHandleCharIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                            guardWithTest(LONGS_SEGMENT_TEST,
-                                                    new MemoryAccessVarHandleCharLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                    guardWithTest(FLOATS_SEGMENT_TEST,
-                                                            new MemoryAccessVarHandleCharFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                            guardWithTest(DOUBLES_SEGMENT_TEST,
-                                                                    new MemoryAccessVarHandleCharDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                                    new MemoryAccessVarHandleCharHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
-                                                            )
-                                                    )
-                                            )
-                                    )
-                            )
-                    )
-            ));
+            return maybeAdapt(guardWithTest(DIRECT_SEGMENT_TEST,
+                    new MemoryAccessVarHandleCharDirectHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleCharBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == short.class) {
-            return maybeAdapt(guardWithTest(BYTES_SEGMENT_TEST,
-                    new MemoryAccessVarHandleShortBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                    guardWithTest(CHARS_SEGMENT_TEST,
-                            new MemoryAccessVarHandleShortCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                            guardWithTest(SHORTS_SEGMENT_TEST,
-                                    new MemoryAccessVarHandleShortShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                    guardWithTest(INTS_SEGMENT_TEST,
-                                            new MemoryAccessVarHandleShortIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                            guardWithTest(LONGS_SEGMENT_TEST,
-                                                    new MemoryAccessVarHandleShortLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                    guardWithTest(FLOATS_SEGMENT_TEST,
-                                                            new MemoryAccessVarHandleShortFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                            guardWithTest(DOUBLES_SEGMENT_TEST,
-                                                                    new MemoryAccessVarHandleShortDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                                    new MemoryAccessVarHandleShortHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
-                                                            )
-                                                    )
-                                            )
-                                    )
-                            )
-                    )
-            ));
+            return maybeAdapt(guardWithTest(DIRECT_SEGMENT_TEST,
+                    new MemoryAccessVarHandleShortDirectHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleShortBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == int.class) {
-            return maybeAdapt(guardWithTest(BYTES_SEGMENT_TEST,
-                    new MemoryAccessVarHandleIntBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                    guardWithTest(CHARS_SEGMENT_TEST,
-                            new MemoryAccessVarHandleIntCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                            guardWithTest(SHORTS_SEGMENT_TEST,
-                                    new MemoryAccessVarHandleIntShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                    guardWithTest(INTS_SEGMENT_TEST,
-                                            new MemoryAccessVarHandleIntIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                            guardWithTest(LONGS_SEGMENT_TEST,
-                                                    new MemoryAccessVarHandleIntLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                    guardWithTest(FLOATS_SEGMENT_TEST,
-                                                            new MemoryAccessVarHandleIntFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                            guardWithTest(DOUBLES_SEGMENT_TEST,
-                                                                    new MemoryAccessVarHandleIntDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                                    new MemoryAccessVarHandleIntHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
-                                                            )
-                                                    )
-                                            )
-                                    )
-                            )
-                    )
-            ));
+            return maybeAdapt(guardWithTest(DIRECT_SEGMENT_TEST,
+                    new MemoryAccessVarHandleIntDirectHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleIntBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == float.class) {
-            return maybeAdapt(guardWithTest(BYTES_SEGMENT_TEST,
-                    new MemoryAccessVarHandleFloatBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                    guardWithTest(CHARS_SEGMENT_TEST,
-                            new MemoryAccessVarHandleFloatCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                            guardWithTest(SHORTS_SEGMENT_TEST,
-                                    new MemoryAccessVarHandleFloatShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                    guardWithTest(INTS_SEGMENT_TEST,
-                                            new MemoryAccessVarHandleFloatIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                            guardWithTest(LONGS_SEGMENT_TEST,
-                                                    new MemoryAccessVarHandleFloatLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                    guardWithTest(FLOATS_SEGMENT_TEST,
-                                                            new MemoryAccessVarHandleFloatFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                            guardWithTest(DOUBLES_SEGMENT_TEST,
-                                                                    new MemoryAccessVarHandleFloatDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                                    new MemoryAccessVarHandleFloatHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
-                                                            )
-                                                    )
-                                            )
-                                    )
-                            )
-                    )
-            ));
+            return maybeAdapt(guardWithTest(DIRECT_SEGMENT_TEST,
+                    new MemoryAccessVarHandleFloatDirectHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleFloatBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == long.class) {
-            return maybeAdapt(guardWithTest(BYTES_SEGMENT_TEST,
-                    new MemoryAccessVarHandleLongBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                    guardWithTest(CHARS_SEGMENT_TEST,
-                            new MemoryAccessVarHandleLongCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                            guardWithTest(SHORTS_SEGMENT_TEST,
-                                    new MemoryAccessVarHandleLongShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                    guardWithTest(INTS_SEGMENT_TEST,
-                                            new MemoryAccessVarHandleLongIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                            guardWithTest(LONGS_SEGMENT_TEST,
-                                                    new MemoryAccessVarHandleLongLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                    guardWithTest(FLOATS_SEGMENT_TEST,
-                                                            new MemoryAccessVarHandleLongFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                            guardWithTest(DOUBLES_SEGMENT_TEST,
-                                                                    new MemoryAccessVarHandleLongDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                                    new MemoryAccessVarHandleLongHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
-                                                            )
-                                                    )
-                                            )
-                                    )
-                            )
-                    )
-            ));
+            return maybeAdapt(guardWithTest(DIRECT_SEGMENT_TEST,
+                    new MemoryAccessVarHandleLongDirectHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleLongBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else if (carrier == double.class) {
-            return maybeAdapt(guardWithTest(BYTES_SEGMENT_TEST,
-                    new MemoryAccessVarHandleDoubleBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                    guardWithTest(CHARS_SEGMENT_TEST,
-                            new MemoryAccessVarHandleDoubleCharsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                            guardWithTest(SHORTS_SEGMENT_TEST,
-                                    new MemoryAccessVarHandleDoubleShortsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                    guardWithTest(INTS_SEGMENT_TEST,
-                                            new MemoryAccessVarHandleDoubleIntsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                            guardWithTest(LONGS_SEGMENT_TEST,
-                                                    new MemoryAccessVarHandleDoubleLongsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                    guardWithTest(FLOATS_SEGMENT_TEST,
-                                                            new MemoryAccessVarHandleDoubleFloatsHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                            guardWithTest(DOUBLES_SEGMENT_TEST,
-                                                                    new MemoryAccessVarHandleDoubleDoublesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
-                                                                    new MemoryAccessVarHandleDoubleHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)
-                                                            )
-                                                    )
-                                            )
-                                    )
-                            )
-                    )
-            ));
+            return maybeAdapt(guardWithTest(DIRECT_SEGMENT_TEST,
+                    new MemoryAccessVarHandleDoubleDirectHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact),
+                    new MemoryAccessVarHandleDoubleBytesHelper(skipAlignmentMaskCheck, be, size, alignmentMask, exact)));
         } else {
             throw new IllegalStateException("Cannot get here");
         }
     }
 
-    private static boolean isBytesSegment(MemorySegmentProxy segmentProxy) {
-        return segmentProxy.unsafeGetBase() instanceof byte[];
-    }
-
-    private static boolean isCharsSegment(MemorySegmentProxy segmentProxy) {
-        return segmentProxy.unsafeGetBase() instanceof char[];
-    }
-
-    private static boolean isShortsSegment(MemorySegmentProxy segmentProxy) {
-        return segmentProxy.unsafeGetBase() instanceof short[];
-    }
-
-    private static boolean isIntsSegment(MemorySegmentProxy segmentProxy) {
-        return segmentProxy.unsafeGetBase() instanceof int[];
-    }
-
-    private static boolean isLongsSegment(MemorySegmentProxy segmentProxy) {
-        return segmentProxy.unsafeGetBase() instanceof long[];
-    }
-
-    private static boolean isFloatsSegment(MemorySegmentProxy segmentProxy) {
-        return segmentProxy.unsafeGetBase() instanceof float[];
-    }
-
-    private static boolean isDoublesSegment(MemorySegmentProxy segmentProxy) {
-        return segmentProxy.unsafeGetBase() instanceof double[];
+    private static boolean isDirectSegment(MemorySegmentProxy segmentProxy) {
+        return segmentProxy.unsafeGetBase() == null;
     }
 
     private static VarHandle maybeAdapt(VarHandle target) {
