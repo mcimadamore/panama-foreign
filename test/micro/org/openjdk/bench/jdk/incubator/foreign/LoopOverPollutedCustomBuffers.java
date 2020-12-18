@@ -25,12 +25,17 @@
 
 package org.openjdk.bench.jdk.incubator.foreign;
 
+import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.IntFunction;
 
 import jdk.incubator.foreign.MemoryAccess;
+import jdk.incubator.foreign.MemoryLayout;
+import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -58,31 +63,49 @@ public class LoopOverPollutedCustomBuffers {
     static final int HEIGHT = 3;
     static final int NUM_ELEMS = WIDTH * HEIGHT;
 
-    private CustomFloatBuffer nativeBuffer;
+    private CustomFloatBuffer nativeBuffer, heapBuffer;
 
     @Param({ "false", "true" })
     boolean pollute;
 
-    @Param({ "false", "true" })
-    boolean nio;
+    @Param({ "NIO", "SEGMENT_VH", "SEGMENT_DIRECT" })
+    BufferKind bufferKind;
+
+    public enum BufferKind {
+        NIO(CustomFloatBufferNIO::of, CustomFloatBufferNIO::of),
+        SEGMENT_VH(CustomFloatBufferSegmentVH::of, CustomFloatBufferSegmentVH::of),
+        SEGMENT_DIRECT(CustomFloatBufferSegmentDirect::of, CustomFloatBufferSegmentDirect::of);
+
+        private final IntFunction<CustomFloatBuffer> directFactory;
+        private final Function<byte[], CustomFloatBuffer> heapViewFactory;
+
+        BufferKind(IntFunction<CustomFloatBuffer> directFactory, Function<byte[], CustomFloatBuffer> heapViewFactory) {
+            this.directFactory = directFactory;
+            this.heapViewFactory = heapViewFactory;
+        }
+
+        CustomFloatBuffer makeDirect(int size) {
+            return directFactory.apply(size);
+        }
+
+        CustomFloatBuffer makeHeapView(byte[] arr) {
+            return heapViewFactory.apply(arr);
+        }
+    }
 
     static final Unsafe unsafe = Utils.unsafe;
 
     @Setup
     public void setUp() {
         int numPixels = WIDTH * HEIGHT;
-        nativeBuffer = nio ?
-                CustomFloatBufferNIO.of(NUM_ELEMS) :
-                CustomFloatBufferSegment.of(NUM_ELEMS);
-        CustomFloatBuffer heapBufferBytes = nio ?
-                CustomFloatBufferNIO.of(new byte[numPixels * 4]) :
-                CustomFloatBufferSegment.of(new byte[numPixels * 4]);
+        nativeBuffer = bufferKind.makeDirect(NUM_ELEMS);
+        heapBuffer = bufferKind.makeHeapView(new byte[numPixels * 4]);
         float f = 0;
         for (int i = 0; i < WIDTH; ++i) {
             for (int j = 0; j < HEIGHT; ++j) {
                 nativeBuffer.setFloat(i * j, i + j);
                 if (pollute) {
-                    f += heapBufferBytes.getFloat(i * j);
+                    f += heapBuffer.getFloat(i * j);
                 }
             }
         }
@@ -105,10 +128,30 @@ public class LoopOverPollutedCustomBuffers {
     }
 
     @Benchmark
+    public float readAllValuesMatrixHeap() {
+        float v = 0;
+        for (int i = 0; i < WIDTH; ++i) {
+            for (int j = 0; j < HEIGHT; ++j) {
+                v += heapBuffer.getFloat(i * j);
+            }
+        }
+        return v;
+    }
+
+    @Benchmark
     public float readAllValuesLinear() {
         float v = 0;
         for (int i = 0; i < NUM_ELEMS; ++i) {
             v += nativeBuffer.getFloat(i);
+        }
+        return v;
+    }
+
+    @Benchmark
+    public float readAllValuesLinearHeap() {
+        float v = 0;
+        for (int i = 0; i < NUM_ELEMS; ++i) {
+            v += heapBuffer.getFloat(i);
         }
         return v;
     }
@@ -119,29 +162,61 @@ public class LoopOverPollutedCustomBuffers {
         void close();
     }
 
-    static class CustomFloatBufferSegment implements CustomFloatBuffer {
+    static class CustomFloatBufferSegmentVH implements CustomFloatBuffer {
         final MemorySegment segment;
 
-        CustomFloatBufferSegment(MemorySegment segment) {
+        static final VarHandle floatHandle = MemoryLayout.ofSequence(MemoryLayouts.JAVA_FLOAT).varHandle(float.class, MemoryLayout.PathElement.sequenceElement());
+
+        CustomFloatBufferSegmentVH(MemorySegment segment) {
             this.segment = segment;
         }
 
         @Override
         public float getFloat(long index) {
-            return MemoryAccess.getFloatAtIndex(segment, index);
+            return (float)floatHandle.get(segment, index);
         }
 
         @Override
         public void setFloat(long index, float value) {
-            MemoryAccess.setFloatAtIndex(segment, index, value);
+            floatHandle.set(segment, index, value);
         }
 
         static CustomFloatBuffer of(int size) {
-            return new CustomFloatBufferSegment(MemorySegment.allocateNative(4 * size, 4));
+            return new CustomFloatBufferSegmentVH(MemorySegment.allocateNative(4 * size, 4));
         }
 
         static CustomFloatBuffer of(byte[] array) {
-            return new CustomFloatBufferSegment(MemorySegment.ofArray(array));
+            return new CustomFloatBufferSegmentVH(MemorySegment.ofArray(array));
+        }
+
+        public void close() {
+            segment.close();
+        }
+    }
+
+    static class CustomFloatBufferSegmentDirect implements CustomFloatBuffer {
+        final MemorySegment segment;
+
+        CustomFloatBufferSegmentDirect(MemorySegment segment) {
+            this.segment = segment;
+        }
+
+        @Override
+        public float getFloat(long index) {
+            return segment.getFloat(index * 4);
+        }
+
+        @Override
+        public void setFloat(long index, float value) {
+            segment.setFloat(index * 4, value);
+        }
+
+        static CustomFloatBuffer of(int size) {
+            return new CustomFloatBufferSegmentDirect(MemorySegment.allocateNative(4 * size, 4));
+        }
+
+        static CustomFloatBuffer of(byte[] array) {
+            return new CustomFloatBufferSegmentDirect(MemorySegment.ofArray(array));
         }
 
         public void close() {

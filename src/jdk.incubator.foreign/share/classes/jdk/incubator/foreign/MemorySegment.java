@@ -236,6 +236,10 @@ public interface MemorySegment extends Addressable, AutoCloseable {
     @Override
     MemoryAddress address();
 
+    float getFloat(long offset);
+
+    void setFloat(long offset, float f);
+
     /**
      * Returns a spliterator for this memory segment. The returned spliterator reports {@link Spliterator#SIZED},
      * {@link Spliterator#SUBSIZED}, {@link Spliterator#IMMUTABLE}, {@link Spliterator#NONNULL} and {@link Spliterator#ORDERED}

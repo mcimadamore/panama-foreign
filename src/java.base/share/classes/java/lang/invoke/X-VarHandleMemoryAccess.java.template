@@ -130,15 +130,13 @@ final class MemoryAccessVarHandle$Type$Helper extends MemoryAccessVarHandleBase 
 
     @ForceInline
     static $type$ get(VarHandle ob, Object obb, long base) {
+#if[floatingPoint]
+        MemorySegmentProxy bb = (MemorySegmentProxy)obb;
+        $rawType$ rawValue = ($rawType$)bb.getFloat(base);
+        return rawValue;// $Type$.$rawType$BitsTo$Type$(rawValue);
+#else[floatingPoint]
         MemoryAccessVarHandleBase handle = (MemoryAccessVarHandleBase)ob;
         MemorySegmentProxy bb = checkAddress(obb, base, handle.length, true);
-#if[floatingPoint]
-        $rawType$ rawValue = SCOPED_MEMORY_ACCESS.get$RawType$Unaligned(bb.scope(),
-                bb.unsafeGetBase(),
-                offsetNoVMAlignCheck(handle.skipAlignmentMaskCheck, bb, base, handle.alignmentMask),
-                handle.be);
-        return $Type$.$rawType$BitsTo$Type$(rawValue);
-#else[floatingPoint]
 #if[byte]
         return SCOPED_MEMORY_ACCESS.get$Type$(bb.scope(),
                 bb.unsafeGetBase(),

@@ -55,7 +55,7 @@ import java.util.function.IntFunction;
  */
 public abstract class AbstractMemorySegmentImpl extends MemorySegmentProxy implements MemorySegment {
 
-    private static final ScopedMemoryAccess SCOPED_MEMORY_ACCESS = ScopedMemoryAccess.getScopedMemoryAccess();
+    static final ScopedMemoryAccess SCOPED_MEMORY_ACCESS = ScopedMemoryAccess.getScopedMemoryAccess();
 
     private static final boolean enableSmallSegments =
             Boolean.parseBoolean(GetPropertyAction.privilegedGetProperty("jdk.incubator.foreign.SmallSegments", "true"));
@@ -105,6 +105,18 @@ public abstract class AbstractMemorySegmentImpl extends MemorySegmentProxy imple
 
     private AbstractMemorySegmentImpl asSliceNoCheck(long offset, long newSize) {
         return dup(offset, newSize, mask, scope);
+    }
+
+    @Override
+    public float getFloat(long offset) {
+        checkAccess(offset, 4, true);
+        return SCOPED_MEMORY_ACCESS.getFloat(scope, base(), min() + offset);
+    }
+
+    @Override
+    public void setFloat(long offset, float f) {
+        checkAccess(offset, 4, false);
+        SCOPED_MEMORY_ACCESS.putFloat(scope, base(), min() + offset, f);
     }
 
     @Override
