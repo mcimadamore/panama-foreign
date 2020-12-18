@@ -33,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
-import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
@@ -63,25 +62,29 @@ public class LoopOverPollutedCustomBuffers {
     static final int HEIGHT = 3;
     static final int NUM_ELEMS = WIDTH * HEIGHT;
 
-    private CustomFloatBuffer nativeBuffer, heapBuffer;
+    private CustomFloatBuffer nativeBuffer, heapBufferBytes, heapBufferFloats;
 
-    @Param({ "false", "true" })
-    boolean pollute;
+    @Param({ "0", "1", "2" })
+    int pollute;
 
     @Param({ "NIO", "SEGMENT_VH", "SEGMENT_DIRECT" })
     BufferKind bufferKind;
 
     public enum BufferKind {
-        NIO(CustomFloatBufferNIO::of, CustomFloatBufferNIO::of),
-        SEGMENT_VH(CustomFloatBufferSegmentVH::of, CustomFloatBufferSegmentVH::of),
-        SEGMENT_DIRECT(CustomFloatBufferSegmentDirect::of, CustomFloatBufferSegmentDirect::of);
+        NIO(CustomFloatBufferNIO::of, CustomFloatBufferNIO::of, CustomFloatBufferNIO::of),
+        SEGMENT_VH(CustomFloatBufferSegmentVH::of, CustomFloatBufferSegmentVH::of, CustomFloatBufferSegmentVH::of),
+        SEGMENT_DIRECT(CustomFloatBufferSegmentDirect::of, CustomFloatBufferSegmentDirect::of, CustomFloatBufferSegmentDirect::of);
 
         private final IntFunction<CustomFloatBuffer> directFactory;
-        private final Function<byte[], CustomFloatBuffer> heapViewFactory;
+        private final Function<byte[], CustomFloatBuffer> heapViewFactoryBytes;
+        private final Function<float[], CustomFloatBuffer> heapViewFactoryFloats;
 
-        BufferKind(IntFunction<CustomFloatBuffer> directFactory, Function<byte[], CustomFloatBuffer> heapViewFactory) {
+        BufferKind(IntFunction<CustomFloatBuffer> directFactory,
+                   Function<byte[], CustomFloatBuffer> heapViewFactoryBytes,
+                   Function<float[], CustomFloatBuffer> heapViewFactoryFloats) {
             this.directFactory = directFactory;
-            this.heapViewFactory = heapViewFactory;
+            this.heapViewFactoryBytes = heapViewFactoryBytes;
+            this.heapViewFactoryFloats = heapViewFactoryFloats;
         }
 
         CustomFloatBuffer makeDirect(int size) {
@@ -89,7 +92,11 @@ public class LoopOverPollutedCustomBuffers {
         }
 
         CustomFloatBuffer makeHeapView(byte[] arr) {
-            return heapViewFactory.apply(arr);
+            return heapViewFactoryBytes.apply(arr);
+        }
+
+        CustomFloatBuffer makeHeapView(float[] arr) {
+            return heapViewFactoryFloats.apply(arr);
         }
     }
 
@@ -99,13 +106,17 @@ public class LoopOverPollutedCustomBuffers {
     public void setUp() {
         int numPixels = WIDTH * HEIGHT;
         nativeBuffer = bufferKind.makeDirect(NUM_ELEMS);
-        heapBuffer = bufferKind.makeHeapView(new byte[numPixels * 4]);
+        heapBufferBytes = bufferKind.makeHeapView(new byte[numPixels * 4]);
+        heapBufferFloats = bufferKind.makeHeapView(new float[numPixels]);
         float f = 0;
         for (int i = 0; i < WIDTH; ++i) {
             for (int j = 0; j < HEIGHT; ++j) {
                 nativeBuffer.setFloat(i * j, i + j);
-                if (pollute) {
-                    f += heapBuffer.getFloat(i * j);
+                if (pollute > 0) {
+                    f += heapBufferBytes.getFloat(i * j);
+                }
+                if (pollute > 1) {
+                    f += heapBufferFloats.getFloat(i * j);
                 }
             }
         }
@@ -128,11 +139,22 @@ public class LoopOverPollutedCustomBuffers {
     }
 
     @Benchmark
-    public float readAllValuesMatrixHeap() {
+    public float readAllValuesMatrixHeapBytes() {
         float v = 0;
         for (int i = 0; i < WIDTH; ++i) {
             for (int j = 0; j < HEIGHT; ++j) {
-                v += heapBuffer.getFloat(i * j);
+                v += heapBufferBytes.getFloat(i * j);
+            }
+        }
+        return v;
+    }
+
+    @Benchmark
+    public float readAllValuesMatrixHeapFloats() {
+        float v = 0;
+        for (int i = 0; i < WIDTH; ++i) {
+            for (int j = 0; j < HEIGHT; ++j) {
+                v += heapBufferFloats.getFloat(i * j);
             }
         }
         return v;
@@ -148,10 +170,19 @@ public class LoopOverPollutedCustomBuffers {
     }
 
     @Benchmark
-    public float readAllValuesLinearHeap() {
+    public float readAllValuesLinearHeapBytes() {
         float v = 0;
         for (int i = 0; i < NUM_ELEMS; ++i) {
-            v += heapBuffer.getFloat(i);
+            v += heapBufferBytes.getFloat(i);
+        }
+        return v;
+    }
+
+    @Benchmark
+    public float readAllValuesLinearHeapFloats() {
+        float v = 0;
+        for (int i = 0; i < NUM_ELEMS; ++i) {
+            v += heapBufferFloats.getFloat(i);
         }
         return v;
     }
@@ -189,6 +220,10 @@ public class LoopOverPollutedCustomBuffers {
             return new CustomFloatBufferSegmentVH(MemorySegment.ofArray(array));
         }
 
+        static CustomFloatBuffer of(float[] array) {
+            return new CustomFloatBufferSegmentVH(MemorySegment.ofArray(array));
+        }
+
         public void close() {
             segment.close();
         }
@@ -216,6 +251,10 @@ public class LoopOverPollutedCustomBuffers {
         }
 
         static CustomFloatBuffer of(byte[] array) {
+            return new CustomFloatBufferSegmentDirect(MemorySegment.ofArray(array));
+        }
+
+        static CustomFloatBuffer of(float[] array) {
             return new CustomFloatBufferSegmentDirect(MemorySegment.ofArray(array));
         }
 
@@ -253,8 +292,13 @@ public class LoopOverPollutedCustomBuffers {
             return new CustomFloatBufferNIO(bb, bb.order(ByteOrder.nativeOrder()).asFloatBuffer());
         }
 
+        static CustomFloatBuffer of(float[] array) {
+            return new CustomFloatBufferNIO(null, FloatBuffer.wrap(array));
+        }
+
         public void close() {
-            unsafe.invokeCleaner(bb);
+            if (bb != null)
+                unsafe.invokeCleaner(bb);
         }
     }
 }
