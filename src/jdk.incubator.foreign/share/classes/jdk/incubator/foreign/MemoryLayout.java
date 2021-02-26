@@ -25,8 +25,8 @@
  */
 package jdk.incubator.foreign;
 
-import jdk.internal.foreign.LayoutPath;
-import jdk.internal.foreign.LayoutPath.PathElementImpl.PathKind;
+import jdk.internal.foreign.LayoutPathImpl;
+import jdk.internal.foreign.LayoutPathImpl.PathElementImpl.PathKind;
 import jdk.internal.foreign.Utils;
 
 import java.lang.constant.Constable;
@@ -361,7 +361,7 @@ public interface MemoryLayout extends Constable {
      * in {@code elements} is {@code null}.
      */
     default long bitOffset(PathElement... elements) {
-        return computePathOp(LayoutPath.rootPath(this, MemoryLayout::bitSize), LayoutPath::offset,
+        return computePathOp(LayoutPathImpl.rootPath(this, MemoryLayout::bitSize), LayoutPathImpl::offset,
                 EnumSet.of(PathKind.SEQUENCE_ELEMENT, PathKind.SEQUENCE_RANGE), elements);
     }
 
@@ -393,7 +393,7 @@ public interface MemoryLayout extends Constable {
      * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size.
      */
     default MethodHandle bitOffsetHandle(PathElement... elements) {
-        return computePathOp(LayoutPath.rootPath(this, MemoryLayout::bitSize), LayoutPath::offsetHandle,
+        return computePathOp(LayoutPathImpl.rootPath(this, MemoryLayout::bitSize), LayoutPathImpl::offsetHandle,
                 EnumSet.of(PathKind.SEQUENCE_RANGE), elements);
     }
 
@@ -489,7 +489,7 @@ public interface MemoryLayout extends Constable {
      */
     default VarHandle varHandle(Class<?> carrier, PathElement... elements) {
         Objects.requireNonNull(carrier);
-        return computePathOp(LayoutPath.rootPath(this, MemoryLayout::bitSize), path -> path.dereferenceHandle(carrier),
+        return computePathOp(LayoutPathImpl.rootPath(this, MemoryLayout::bitSize), path -> path.dereferenceHandle(carrier),
                 Set.of(), elements);
     }
 
@@ -503,7 +503,7 @@ public interface MemoryLayout extends Constable {
      * (see {@link PathElement#sequenceElement(long)} and {@link PathElement#sequenceElement(long, long)}).
      */
     default MemoryLayout select(PathElement... elements) {
-        return computePathOp(LayoutPath.rootPath(this, l -> 0L), LayoutPath::layout,
+        return computePathOp(LayoutPathImpl.rootPath(this, l -> 0L), LayoutPathImpl::layout,
                 EnumSet.of(PathKind.SEQUENCE_ELEMENT_INDEX, PathKind.SEQUENCE_RANGE), elements);
     }
 
@@ -521,15 +521,15 @@ public interface MemoryLayout extends Constable {
      */
     default MemoryLayout map(UnaryOperator<MemoryLayout> op, PathElement... elements) {
         Objects.requireNonNull(op);
-        return computePathOp(LayoutPath.rootPath(this, l -> 0L), path -> path.map(op),
+        return computePathOp(LayoutPathImpl.rootPath(this, l -> 0L), path -> path.map(op),
                 EnumSet.of(PathKind.SEQUENCE_ELEMENT_INDEX, PathKind.SEQUENCE_RANGE), elements);
     }
 
-    private static <Z> Z computePathOp(LayoutPath path, Function<LayoutPath, Z> finalizer,
-                                       Set<LayoutPath.PathElementImpl.PathKind> badKinds, PathElement... elements) {
+    private static <Z> Z computePathOp(LayoutPathImpl path, Function<LayoutPathImpl, Z> finalizer,
+                                       Set<LayoutPathImpl.PathElementImpl.PathKind> badKinds, PathElement... elements) {
         Objects.requireNonNull(elements);
         for (PathElement e : elements) {
-            LayoutPath.PathElementImpl pathElem = (LayoutPath.PathElementImpl)Objects.requireNonNull(e);
+            LayoutPathImpl.PathElementImpl pathElem = (LayoutPathImpl.PathElementImpl)Objects.requireNonNull(e);
             if (badKinds.contains(pathElem.kind())) {
                 throw new IllegalArgumentException(String.format("Invalid %s selection in layout path", pathElem.kind().description()));
             }
@@ -543,6 +543,21 @@ public interface MemoryLayout extends Constable {
      * @return true, if this layout is a padding layout.
      */
     boolean isPadding();
+
+    interface LayoutPath {
+        VarHandle varHandle(Class<?> clazz);
+        int freeDimensions();
+    }
+
+    default LayoutPath path(PathElement... elements) {
+        LayoutPathImpl path = LayoutPathImpl.rootPath(this, l -> 0L);
+        Objects.requireNonNull(elements);
+        for (PathElement e : elements) {
+            LayoutPathImpl.PathElementImpl pathElem = (LayoutPathImpl.PathElementImpl)Objects.requireNonNull(e);
+            path = pathElem.apply(path);
+        }
+        return path;
+    }
 
     /**
      * Instances of this class are used to form <a href="MemoryLayout.html#layout-paths"><em>layout paths</em></a>. There
@@ -580,7 +595,7 @@ public interface MemoryLayout extends Constable {
          */
         static PathElement groupElement(String name) {
             Objects.requireNonNull(name);
-            return new LayoutPath.PathElementImpl(LayoutPath.PathElementImpl.PathKind.GROUP_ELEMENT,
+            return new LayoutPathImpl.PathElementImpl(LayoutPathImpl.PathElementImpl.PathKind.GROUP_ELEMENT,
                                                   path -> path.groupElement(name));
         }
 
@@ -597,7 +612,7 @@ public interface MemoryLayout extends Constable {
             if (index < 0) {
                 throw new IllegalArgumentException("Index must be positive: " + index);
             }
-            return new LayoutPath.PathElementImpl(LayoutPath.PathElementImpl.PathKind.SEQUENCE_ELEMENT_INDEX,
+            return new LayoutPathImpl.PathElementImpl(LayoutPathImpl.PathElementImpl.PathKind.SEQUENCE_ELEMENT_INDEX,
                                                   path -> path.sequenceElement(index));
         }
 
@@ -626,7 +641,7 @@ E * (S + I * F)
             if (step == 0) {
                 throw new IllegalArgumentException("Step must be != 0: " + step);
             }
-            return new LayoutPath.PathElementImpl(LayoutPath.PathElementImpl.PathKind.SEQUENCE_RANGE,
+            return new LayoutPathImpl.PathElementImpl(LayoutPathImpl.PathElementImpl.PathKind.SEQUENCE_RANGE,
                                                   path -> path.sequenceElement(start, step));
         }
 
@@ -638,8 +653,8 @@ E * (S + I * F)
          * @return a path element which selects an unspecified sequence element layout.
          */
         static PathElement sequenceElement() {
-            return new LayoutPath.PathElementImpl(LayoutPath.PathElementImpl.PathKind.SEQUENCE_ELEMENT,
-                                                  LayoutPath::sequenceElement);
+            return new LayoutPathImpl.PathElementImpl(LayoutPathImpl.PathElementImpl.PathKind.SEQUENCE_ELEMENT,
+                                                  LayoutPathImpl::sequenceElement);
         }
     }
 

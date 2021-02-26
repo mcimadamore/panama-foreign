@@ -1452,4 +1452,12 @@ public final class MemoryAccess {
     private static long scale(MemorySegment address, long index, int size) {
         return MemorySegmentProxy.multiplyOffsets(index, size, (MemorySegmentProxy)address);
     }
+
+    @ForceInline
+    public static int getIntAtIndex(MemorySegment segment, MemoryLayout.LayoutPath path, long index) {
+        if (path.freeDimensions() != 1) {
+            throw new UnsupportedOperationException("Bad path");
+        }
+        return (int)path.varHandle(int.class).get(segment, index);
+    }
 }

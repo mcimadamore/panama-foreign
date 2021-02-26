@@ -35,7 +35,7 @@ import jdk.internal.access.foreign.MemorySegmentProxy;
 import jdk.incubator.foreign.GroupLayout;
 import jdk.incubator.foreign.SequenceLayout;
 import jdk.incubator.foreign.ValueLayout;
-import sun.invoke.util.Wrapper;
+import jdk.internal.vm.annotation.Stable;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -56,7 +56,7 @@ import java.util.function.UnaryOperator;
  * by the path (see {@link #offset}), or obtain a memory access var handle to access the selected layout element
  * given an address pointing to a segment associated with the root layout (see {@link #dereferenceHandle(Class)}).
  */
-public class LayoutPath {
+public class LayoutPathImpl implements MemoryLayout.LayoutPath {
 
     private static final JavaLangInvokeAccess JLI = SharedSecrets.getJavaLangInvokeAccess();
 
@@ -68,9 +68,9 @@ public class LayoutPath {
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
-            ADD_STRIDE = lookup.findStatic(LayoutPath.class, "addStride",
+            ADD_STRIDE = lookup.findStatic(LayoutPathImpl.class, "addStride",
                     MethodType.methodType(long.class, MemorySegment.class, long.class, long.class, long.class));
-            MH_ADD_SCALED_OFFSET = lookup.findStatic(LayoutPath.class, "addScaledOffset",
+            MH_ADD_SCALED_OFFSET = lookup.findStatic(LayoutPathImpl.class, "addScaledOffset",
                     MethodType.methodType(long.class, long.class, long.class, long.class));
         } catch (Throwable ex) {
             throw new ExceptionInInitializerError(ex);
@@ -79,12 +79,13 @@ public class LayoutPath {
 
     private final MemoryLayout layout;
     private final long offset;
-    private final LayoutPath enclosing;
+    private final LayoutPathImpl enclosing;
+    @Stable
     private final long[] strides;
     private final long elementIndex;
     private final ToLongFunction<MemoryLayout> sizeFunc;
 
-    private LayoutPath(MemoryLayout layout, long offset, long[] strides, long elementIndex, LayoutPath enclosing, ToLongFunction<MemoryLayout> sizeFunc) {
+    private LayoutPathImpl(MemoryLayout layout, long offset, long[] strides, long elementIndex, LayoutPathImpl enclosing, ToLongFunction<MemoryLayout> sizeFunc) {
         this.layout = layout;
         this.offset = offset;
         this.strides = strides;
@@ -95,24 +96,24 @@ public class LayoutPath {
 
     // Layout path selector methods
 
-    public LayoutPath sequenceElement() {
+    public LayoutPathImpl sequenceElement() {
         check(SequenceLayout.class, "attempting to select a sequence element from a non-sequence layout");
         SequenceLayout seq = (SequenceLayout)layout;
         MemoryLayout elem = seq.elementLayout();
-        return LayoutPath.nestedPath(elem, offset, addStride(sizeFunc.applyAsLong(elem)), UNSPECIFIED_ELEM_INDEX, this);
+        return LayoutPathImpl.nestedPath(elem, offset, addStride(sizeFunc.applyAsLong(elem)), UNSPECIFIED_ELEM_INDEX, this);
     }
 
-    public LayoutPath sequenceElement(long start, long step) {
+    public LayoutPathImpl sequenceElement(long start, long step) {
         check(SequenceLayout.class, "attempting to select a sequence element from a non-sequence layout");
         SequenceLayout seq = (SequenceLayout)layout;
         checkSequenceBounds(seq, start);
         MemoryLayout elem = seq.elementLayout();
         long elemSize = sizeFunc.applyAsLong(elem);
-        return LayoutPath.nestedPath(elem, offset + (start * elemSize), addStride(elemSize * step),
+        return LayoutPathImpl.nestedPath(elem, offset + (start * elemSize), addStride(elemSize * step),
                 UNSPECIFIED_ELEM_INDEX, this);
     }
 
-    public LayoutPath sequenceElement(long index) {
+    public LayoutPathImpl sequenceElement(long index) {
         check(SequenceLayout.class, "attempting to select a sequence element from a non-sequence layout");
         SequenceLayout seq = (SequenceLayout)layout;
         checkSequenceBounds(seq, index);
@@ -122,10 +123,10 @@ public class LayoutPath {
             long elemSize = sizeFunc.applyAsLong(seq.elementLayout());
             elemOffset = elemSize * index;
         }
-        return LayoutPath.nestedPath(seq.elementLayout(), offset + elemOffset, strides, index, this);
+        return LayoutPathImpl.nestedPath(seq.elementLayout(), offset + elemOffset, strides, index, this);
     }
 
-    public LayoutPath groupElement(String name) {
+    public LayoutPathImpl groupElement(String name) {
         check(GroupLayout.class, "attempting to select a group element from a non-group layout");
         GroupLayout g = (GroupLayout)layout;
         long offset = 0;
@@ -145,13 +146,23 @@ public class LayoutPath {
         if (elem == null) {
             throw badLayoutPath("cannot resolve '" + name + "' in layout " + layout);
         }
-        return LayoutPath.nestedPath(elem, this.offset + offset, strides, index, this);
+        return LayoutPathImpl.nestedPath(elem, this.offset + offset, strides, index, this);
     }
 
     // Layout path projections
 
     public long offset() {
         return offset;
+    }
+
+    @Stable
+    VarHandle handle;
+
+    public VarHandle varHandle(Class<?> carrier) {
+        if (handle == null) {
+            handle = dereferenceHandle(carrier);
+        }
+        return handle;
     }
 
     public VarHandle dereferenceHandle(Class<?> carrier) {
@@ -240,12 +251,12 @@ public class LayoutPath {
 
     // Layout path construction
 
-    public static LayoutPath rootPath(MemoryLayout layout, ToLongFunction<MemoryLayout> sizeFunc) {
-        return new LayoutPath(layout, 0L, EMPTY_STRIDES, -1, null, sizeFunc);
+    public static LayoutPathImpl rootPath(MemoryLayout layout, ToLongFunction<MemoryLayout> sizeFunc) {
+        return new LayoutPathImpl(layout, 0L, EMPTY_STRIDES, -1, null, sizeFunc);
     }
 
-    private static LayoutPath nestedPath(MemoryLayout layout, long offset, long[] strides, long elementIndex, LayoutPath encl) {
-        return new LayoutPath(layout, offset, strides, elementIndex, encl, encl.sizeFunc);
+    private static LayoutPathImpl nestedPath(MemoryLayout layout, long offset, long[] strides, long elementIndex, LayoutPathImpl encl) {
+        return new LayoutPathImpl(layout, offset, strides, elementIndex, encl, encl.sizeFunc);
     }
 
     // Helper methods
@@ -266,7 +277,7 @@ public class LayoutPath {
         return new IllegalArgumentException("Bad layout path: " + cause);
     }
 
-    private static void checkAlignment(LayoutPath path) {
+    private static void checkAlignment(LayoutPathImpl path) {
         MemoryLayout layout = path.layout;
         long alignment = layout.bitAlignment();
         if (path.offset % alignment != 0) {
@@ -277,7 +288,7 @@ public class LayoutPath {
                 throw new UnsupportedOperationException("Alignment requirements for layout " + layout + " do not match stride " + stride);
             }
         }
-        LayoutPath encl = path.enclosing;
+        LayoutPathImpl encl = path.enclosing;
         if (encl != null) {
             if (encl.layout.bitAlignment() < alignment) {
                 throw new UnsupportedOperationException("Alignment requirements for layout " + layout + " do not match those for enclosing layout " + encl.layout);
@@ -295,11 +306,16 @@ public class LayoutPath {
 
     private static final long[] EMPTY_STRIDES = new long[0];
 
+    @Override
+    public int freeDimensions() {
+        return strides.length;
+    }
+
     /**
      * This class provides an immutable implementation for the {@code PathElement} interface. A path element implementation
      * is simply a pointer to one of the selector methods provided by the {@code LayoutPath} class.
      */
-    public static class PathElementImpl implements MemoryLayout.PathElement, UnaryOperator<LayoutPath> {
+    public static class PathElementImpl implements MemoryLayout.PathElement, UnaryOperator<LayoutPathImpl> {
 
         public enum PathKind {
             SEQUENCE_ELEMENT("unbound sequence element"),
@@ -319,15 +335,15 @@ public class LayoutPath {
         }
 
         final PathKind kind;
-        final UnaryOperator<LayoutPath> pathOp;
+        final UnaryOperator<LayoutPathImpl> pathOp;
 
-        public PathElementImpl(PathKind kind, UnaryOperator<LayoutPath> pathOp) {
+        public PathElementImpl(PathKind kind, UnaryOperator<LayoutPathImpl> pathOp) {
             this.kind = kind;
             this.pathOp = pathOp;
         }
 
         @Override
-        public LayoutPath apply(LayoutPath layoutPath) {
+        public LayoutPathImpl apply(LayoutPathImpl layoutPath) {
             return pathOp.apply(layoutPath);
         }
 

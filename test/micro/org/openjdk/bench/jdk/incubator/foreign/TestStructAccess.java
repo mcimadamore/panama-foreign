@@ -64,12 +64,13 @@ public class TestStructAccess {
     static final Unsafe unsafe = Utils.unsafe;
 
     static final int SEQ_SIZE = 1_000_000;
-    static final int ELEM_SIZE = SEQ_SIZE * 2;
+    static final int ELEM_SIZE = SEQ_SIZE * 3;
     static final int VALUE_SIZE = 4;
 
     static final SequenceLayout LAYOUT = MemoryLayout.ofSequence(SEQ_SIZE,
             MemoryLayout.ofStruct(
-                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("key"),
+                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("key1"),
+                    MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("key2"),
                     MemoryLayout.ofValueBits(32, ByteOrder.nativeOrder()).withName("value")
             )
     ).withName("KeyValues");
@@ -78,6 +79,9 @@ public class TestStructAccess {
     static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).varHandle(int.class, MemoryLayout.PathElement.sequenceElement());
     static final VarHandle VH_value = LAYOUT.varHandle(int.class, sequenceElement(), groupElement("value"));
     static final FastAccess fastAccess = FastAccess.of(LAYOUT);
+    static final MemoryLayout.LayoutPath VALUE_PATH = LAYOUT.path(sequenceElement(), groupElement("value"));
+    static final MemoryLayout.LayoutPath KEY1_PATH = LAYOUT.path(sequenceElement(), groupElement("key1"));
+    static final MemoryLayout.LayoutPath KEY2_PATH = LAYOUT.path(sequenceElement(), groupElement("key2"));
 
 
     MemorySegment segment;
@@ -99,6 +103,22 @@ public class TestStructAccess {
         for (int i = 0; i < ELEM_SIZE; i++) {
             byteBuffer.putInt(i * VALUE_SIZE , i);
         }
+
+        int res = 0;
+        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+            res += MemoryAccess.getIntAtIndex(segment, KEY1_PATH, i);
+        }
+        System.err.println(res);
+        res = 0;
+        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+            res += MemoryAccess.getIntAtIndex(segment, KEY2_PATH, i);
+        }
+        System.err.println(res);
+        res = 0;
+        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+            res += MemoryAccess.getIntAtIndex(segment, VALUE_PATH, i);
+        }
+        System.err.println(res);
     }
 
     @TearDown
@@ -136,11 +156,10 @@ public class TestStructAccess {
     }
 
     @Benchmark
-    public int fastaccess_loop_local() {
-        FastAccess fastAccessLocal = FastAccess.of(LAYOUT);
+    public int segment_loop_path() {
         int sum = 0;
         for (int i = 0; i < SEQ_SIZE; i++) {
-            sum += fastAccessLocal.getInt(segment, "[].value", i);
+            sum += MemoryAccess.getIntAtIndex(segment, VALUE_PATH, i);
         }
         return sum;
     }
