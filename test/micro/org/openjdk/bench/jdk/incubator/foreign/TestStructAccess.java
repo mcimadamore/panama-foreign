@@ -25,11 +25,8 @@
 
 package org.openjdk.bench.jdk.incubator.foreign;
 
-import jdk.incubator.foreign.FastAccess;
 import jdk.incubator.foreign.MemoryAccess;
-import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayout;
-import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.SequenceLayout;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -49,8 +46,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.TimeUnit;
 
-import static jdk.incubator.foreign.MemoryLayout.PathElement.groupElement;
-import static jdk.incubator.foreign.MemoryLayout.PathElement.sequenceElement;
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -76,13 +71,15 @@ public class TestStructAccess {
     ).withName("KeyValues");
 
 
-    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).varHandle(int.class, MemoryLayout.PathElement.sequenceElement());
-    static final VarHandle VH_value = LAYOUT.varHandle(int.class, sequenceElement(), groupElement("value"));
-    static final FastAccess fastAccess = FastAccess.of(LAYOUT);
-    static final MemoryLayout.LayoutPath VALUE_PATH = LAYOUT.path(sequenceElement(), groupElement("value"));
-    static final MemoryLayout.LayoutPath KEY1_PATH = LAYOUT.path(sequenceElement(), groupElement("key1"));
-    static final MemoryLayout.LayoutPath KEY2_PATH = LAYOUT.path(sequenceElement(), groupElement("key2"));
+    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).path()
+            .sequenceElement().varHandle(int.class);
 
+    static final VarHandle VH_value = LAYOUT.path()
+            .sequenceElement().groupElement("value").varHandle(int.class);
+
+    static final MemoryLayout.Path VALUE_PATH = LAYOUT.path().sequenceElement().groupElement("value");
+    static final MemoryLayout.Path KEY1_PATH = LAYOUT.path().sequenceElement().groupElement("key1");
+    static final MemoryLayout.Path KEY2_PATH = LAYOUT.path().sequenceElement().groupElement("key2");
 
     MemorySegment segment;
     long unsafe_addr;
@@ -104,21 +101,21 @@ public class TestStructAccess {
             byteBuffer.putInt(i * VALUE_SIZE , i);
         }
 
-        int res = 0;
-        for (int i = 0 ; i < SEQ_SIZE ; i++) {
-            res += MemoryAccess.getIntAtIndex(segment, KEY1_PATH, i);
-        }
-        System.err.println(res);
-        res = 0;
-        for (int i = 0 ; i < SEQ_SIZE ; i++) {
-            res += MemoryAccess.getIntAtIndex(segment, KEY2_PATH, i);
-        }
-        System.err.println(res);
-        res = 0;
-        for (int i = 0 ; i < SEQ_SIZE ; i++) {
-            res += MemoryAccess.getIntAtIndex(segment, VALUE_PATH, i);
-        }
-        System.err.println(res);
+//        int res = 0;
+//        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+//            res += MemoryAccess.getIntAtIndex(segment, KEY1_PATH, i);
+//        }
+//        System.err.println(res);
+//        res = 0;
+//        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+//            res += MemoryAccess.getIntAtIndex(segment, KEY2_PATH, i);
+//        }
+//        System.err.println(res);
+//        res = 0;
+//        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+//            res += MemoryAccess.getIntAtIndex(segment, VALUE_PATH, i);
+//        }
+//        System.err.println(res);
     }
 
     @TearDown
@@ -142,15 +139,6 @@ public class TestStructAccess {
         int sum = 0;
         for (int i = 0; i < SEQ_SIZE; i++) {
             sum += (int) VH_value.get(segment, (long) i);
-        }
-        return sum;
-    }
-
-    @Benchmark
-    public int fastaccess_loop() {
-        int sum = 0;
-        for (int i = 0; i < SEQ_SIZE; i++) {
-            sum += fastAccess.getInt(segment, "[].value", i);
         }
         return sum;
     }

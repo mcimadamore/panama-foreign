@@ -43,7 +43,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.TimeUnit;
 
-import static jdk.incubator.foreign.MemoryLayout.PathElement.sequenceElement;
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -73,7 +72,7 @@ public class LoopOverConstant {
     //setup native memory segment
 
     static final MemorySegment segment = MemorySegment.allocateNative(ALLOC_SIZE);
-    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).varHandle(int.class, sequenceElement());
+    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).path().sequenceElement().varHandle(int.class);
 
     static {
         for (int i = 0; i < ELEM_SIZE; i++) {

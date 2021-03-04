@@ -40,7 +40,6 @@ import java.util.Objects;
 
 import static jdk.internal.foreign.PlatformLayouts.AArch64;
 import static jdk.incubator.foreign.CLinker.VaList;
-import static jdk.incubator.foreign.MemoryLayout.PathElement.groupElement;
 import static jdk.internal.foreign.abi.SharedUtils.SimpleVaArg;
 import static jdk.internal.foreign.abi.SharedUtils.checkCompatibleType;
 import static jdk.internal.foreign.abi.SharedUtils.vhPrimitiveOrAddress;
@@ -87,15 +86,15 @@ public class AArch64VaList implements VaList {
     private static final int MAX_FP_OFFSET = (int) LAYOUT_FP_REGS.byteSize();
 
     private static final VarHandle VH_stack
-        = MemoryHandles.asAddressVarHandle(LAYOUT.varHandle(long.class, groupElement("__stack")));
+        = MemoryHandles.asAddressVarHandle(LAYOUT.path().groupElement("__stack").varHandle(long.class));
     private static final VarHandle VH_gr_top
-        = MemoryHandles.asAddressVarHandle(LAYOUT.varHandle(long.class, groupElement("__gr_top")));
+        = MemoryHandles.asAddressVarHandle(LAYOUT.path().groupElement("__gr_top").varHandle(long.class));
     private static final VarHandle VH_vr_top
-        = MemoryHandles.asAddressVarHandle(LAYOUT.varHandle(long.class, groupElement("__vr_top")));
+        = MemoryHandles.asAddressVarHandle(LAYOUT.path().groupElement("__vr_top").varHandle(long.class));
     private static final VarHandle VH_gr_offs
-        = LAYOUT.varHandle(int.class, groupElement("__gr_offs"));
+        = LAYOUT.path().groupElement("__gr_offs").varHandle(int.class);
     private static final VarHandle VH_vr_offs
-        = LAYOUT.varHandle(int.class, groupElement("__vr_offs"));
+        = LAYOUT.path().groupElement("__vr_offs").varHandle(int.class);
 
     private static final Cleaner cleaner = Cleaner.create();
     private static final VaList EMPTY
@@ -328,7 +327,7 @@ public class AArch64VaList implements VaList {
                     yield res;
                 }
                 case FLOAT -> {
-                    VarHandle reader = layout.varHandle(carrier);
+                    VarHandle reader = layout.path().varHandle(carrier);
                     Object res = reader.get(fpRegsArea.asSlice(currentFPOffset()));
                     consumeFPSlots(1);
                     yield res;
@@ -516,7 +515,7 @@ public class AArch64VaList implements VaList {
                         currentGPOffset += GP_SLOT_SIZE;
                     }
                     case FLOAT -> {
-                        VarHandle writer = layout.varHandle(carrier);
+                        VarHandle writer = layout.path().varHandle(carrier);
                         writer.set(fpRegs.asSlice(currentFPOffset), value);
                         currentFPOffset += FP_SLOT_SIZE;
                     }

@@ -34,7 +34,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 class BufferLayout {
-    static final VarHandle VH_LONG = MemoryLayouts.JAVA_LONG.varHandle(long.class);
+    static final VarHandle VH_LONG = MemoryLayouts.JAVA_LONG.path().varHandle(long.class);
 
     final long size;
     final long arguments_next_pc;

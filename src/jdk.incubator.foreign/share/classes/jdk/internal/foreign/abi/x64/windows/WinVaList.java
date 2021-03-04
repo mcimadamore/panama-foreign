@@ -57,7 +57,7 @@ import static jdk.internal.foreign.PlatformLayouts.Win64.C_POINTER;
 class WinVaList implements VaList {
     public static final Class<?> CARRIER = MemoryAddress.class;
     private static final long VA_SLOT_SIZE_BYTES = 8;
-    private static final VarHandle VH_address = MemoryHandles.asAddressVarHandle(C_POINTER.varHandle(long.class));
+    private static final VarHandle VH_address = MemoryHandles.asAddressVarHandle(C_POINTER.path().varHandle(long.class));
 
     private static final VaList EMPTY = new SharedUtils.EmptyVaList(MemoryAddress.NULL);
 

@@ -69,7 +69,7 @@ public class ProgrammableInvoker {
 
     private static final JavaLangInvokeAccess JLIA = SharedSecrets.getJavaLangInvokeAccess();
 
-    private static final VarHandle VH_LONG = MemoryLayouts.JAVA_LONG.varHandle(long.class);
+    private static final VarHandle VH_LONG = MemoryLayouts.JAVA_LONG.path().varHandle(long.class);
 
     private static final MethodHandle MH_INVOKE_MOVES;
     private static final MethodHandle MH_INVOKE_INTERP_BINDINGS;

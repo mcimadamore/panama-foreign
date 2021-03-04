@@ -95,7 +95,7 @@ public interface NativeScope extends AutoCloseable {
      */
     default MemorySegment allocate(ValueLayout layout, byte value) {
         Objects.requireNonNull(layout);
-        VarHandle handle = layout.varHandle(byte.class);
+        VarHandle handle = layout.path().varHandle(byte.class);
         MemorySegment addr = allocate(layout);
         handle.set(addr, value);
         return addr;
@@ -114,7 +114,7 @@ public interface NativeScope extends AutoCloseable {
      */
     default MemorySegment allocate(ValueLayout layout, char value) {
         Objects.requireNonNull(layout);
-        VarHandle handle = layout.varHandle(char.class);
+        VarHandle handle = layout.path().varHandle(char.class);
         MemorySegment addr = allocate(layout);
         handle.set(addr, value);
         return addr;
@@ -133,7 +133,7 @@ public interface NativeScope extends AutoCloseable {
      */
     default MemorySegment allocate(ValueLayout layout, short value) {
         Objects.requireNonNull(layout);
-        VarHandle handle = layout.varHandle(short.class);
+        VarHandle handle = layout.path().varHandle(short.class);
         MemorySegment addr = allocate(layout);
         handle.set(addr, value);
         return addr;
@@ -152,7 +152,7 @@ public interface NativeScope extends AutoCloseable {
      */
     default MemorySegment allocate(ValueLayout layout, int value) {
         Objects.requireNonNull(layout);
-        VarHandle handle = layout.varHandle(int.class);
+        VarHandle handle = layout.path().varHandle(int.class);
         MemorySegment addr = allocate(layout);
         handle.set(addr, value);
         return addr;
@@ -171,7 +171,7 @@ public interface NativeScope extends AutoCloseable {
      */
     default MemorySegment allocate(ValueLayout layout, float value) {
         Objects.requireNonNull(layout);
-        VarHandle handle = layout.varHandle(float.class);
+        VarHandle handle = layout.path().varHandle(float.class);
         MemorySegment addr = allocate(layout);
         handle.set(addr, value);
         return addr;
@@ -190,7 +190,7 @@ public interface NativeScope extends AutoCloseable {
      */
     default MemorySegment allocate(ValueLayout layout, long value) {
         Objects.requireNonNull(layout);
-        VarHandle handle = layout.varHandle(long.class);
+        VarHandle handle = layout.path().varHandle(long.class);
         MemorySegment addr = allocate(layout);
         handle.set(addr, value);
         return addr;
@@ -209,7 +209,7 @@ public interface NativeScope extends AutoCloseable {
      */
     default MemorySegment allocate(ValueLayout layout, double value) {
         Objects.requireNonNull(layout);
-        VarHandle handle = layout.varHandle(double.class);
+        VarHandle handle = layout.path().varHandle(double.class);
         MemorySegment addr = allocate(layout);
         handle.set(addr, value);
         return addr;

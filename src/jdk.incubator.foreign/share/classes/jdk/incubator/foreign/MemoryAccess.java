@@ -1454,7 +1454,7 @@ public final class MemoryAccess {
     }
 
     @ForceInline
-    public static int getIntAtIndex(MemorySegment segment, MemoryLayout.LayoutPath path, long index) {
+    public static int getIntAtIndex(MemorySegment segment, MemoryLayout.Path path, long index) {
         if (path.freeDimensions() != 1) {
             throw new UnsupportedOperationException("Bad path");
         }

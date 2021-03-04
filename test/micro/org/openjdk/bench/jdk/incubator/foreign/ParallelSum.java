@@ -54,7 +54,6 @@ import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 import java.util.stream.StreamSupport;
 
-import static jdk.incubator.foreign.MemoryLayout.PathElement.sequenceElement;
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -68,7 +67,7 @@ public class ParallelSum {
     final static int CARRIER_SIZE = 4;
     final static int ALLOC_SIZE = CARRIER_SIZE * 1024 * 1024 * 256;
     final static int ELEM_SIZE = ALLOC_SIZE / CARRIER_SIZE;
-    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).varHandle(int.class, sequenceElement());
+    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).path().sequenceElement().varHandle(int.class);
 
     final static SequenceLayout SEQUENCE_LAYOUT = MemoryLayout.ofSequence(ELEM_SIZE, MemoryLayouts.JAVA_INT);
     final static int BULK_FACTOR = 512;

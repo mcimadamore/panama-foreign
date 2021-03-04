@@ -48,8 +48,8 @@ public class UnrolledAccess {
 
     final static int SIZE = 1024;
 
-    static final VarHandle LONG_HANDLE = MemoryLayout.ofSequence(SIZE, MemoryLayouts.JAVA_LONG)
-            .varHandle(long.class, MemoryLayout.PathElement.sequenceElement());
+    static final VarHandle LONG_HANDLE = MemoryLayout.ofSequence(SIZE, MemoryLayouts.JAVA_LONG).path()
+            .sequenceElement().varHandle(long.class);
 
     @State(Scope.Benchmark)
     public static class Data {

@@ -26,7 +26,6 @@
 package jdk.incubator.foreign;
 
 import jdk.internal.foreign.LayoutPathImpl;
-import jdk.internal.foreign.LayoutPathImpl.PathElementImpl.PathKind;
 import jdk.internal.foreign.Utils;
 
 import java.lang.constant.Constable;
@@ -35,12 +34,9 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
-import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -348,216 +344,10 @@ public interface MemoryLayout extends Constable {
     Stream<String> attributes();
 
     /**
-     * Computes the offset, in bits, of the layout selected by a given layout path, where the path is considered rooted in this
-     * layout.
-     *
-     * @param elements the layout path elements.
-     * @return The offset, in bits, of the layout selected by the layout path in {@code elements}.
-     * @throws IllegalArgumentException if the layout path does not select any layout nested in this layout, or if the
-     * layout path contains one or more path elements that select multiple sequence element indices
-     * (see {@link PathElement#sequenceElement()} and {@link PathElement#sequenceElement(long, long)}).
-     * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size.
-     * @throws NullPointerException if either {@code elements == null}, or if any of the elements
-     * in {@code elements} is {@code null}.
-     */
-    default long bitOffset(PathElement... elements) {
-        return computePathOp(LayoutPathImpl.rootPath(this, MemoryLayout::bitSize), LayoutPathImpl::offset,
-                EnumSet.of(PathKind.SEQUENCE_ELEMENT, PathKind.SEQUENCE_RANGE), elements);
-    }
-
-    /**
-     * Creates a method handle that can be used to compute the offset, in bits, of the layout selected
-     * by a given layout path, where the path is considered rooted in this layout.
-     *
-     * <p>The returned method handle has a return type of {@code long}, and features as many {@code long}
-     * parameter types as there are free dimensions in the provided layout path (see {@link PathElement#sequenceElement()},
-     * where the order of the parameters corresponds to the order of the path elements.
-     * The returned method handle can be used to compute a layout offset similar to {@link #bitOffset(PathElement...)},
-     * but where some sequence indices are specified only when invoking the method handle.
-     *
-     * <p>The final offset returned by the method handle is computed as follows:
-     *
-     * <blockquote><pre>{@code
-    offset = c_1 + c_2 + ... + c_m + (x_1 * s_1) + (x_2 * s_2) + ... + (x_n * s_n)
-     * }</pre></blockquote>
-     *
-     * where {@code x_1}, {@code x_2}, ... {@code x_n} are <em>dynamic</em> values provided as {@code long}
-     * arguments, whereas {@code c_1}, {@code c_2}, ... {@code c_m} and {@code s_0}, {@code s_1}, ... {@code s_n} are
-     * <em>static</em> stride constants which are derived from the layout path.
-     *
-     * @param elements the layout path elements.
-     * @return a method handle that can be used to compute the bit offset of the layout element
-     * specified by the given layout path elements, when supplied with the missing sequence element indices.
-     * @throws IllegalArgumentException if the layout path contains one or more path elements that select
-     * multiple sequence element indices (see {@link PathElement#sequenceElement(long, long)}).
-     * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size.
-     */
-    default MethodHandle bitOffsetHandle(PathElement... elements) {
-        return computePathOp(LayoutPathImpl.rootPath(this, MemoryLayout::bitSize), LayoutPathImpl::offsetHandle,
-                EnumSet.of(PathKind.SEQUENCE_RANGE), elements);
-    }
-
-    /**
-     * Computes the offset, in bytes, of the layout selected by a given layout path, where the path is considered rooted in this
-     * layout.
-     *
-     * @param elements the layout path elements.
-     * @return The offset, in bytes, of the layout selected by the layout path in {@code elements}.
-     * @throws IllegalArgumentException if the layout path does not select any layout nested in this layout, or if the
-     * layout path contains one or more path elements that select multiple sequence element indices
-     * (see {@link PathElement#sequenceElement()} and {@link PathElement#sequenceElement(long, long)}).
-     * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size,
-     * or if {@code bitOffset(elements)} is not a multiple of 8.
-     * @throws NullPointerException if either {@code elements == null}, or if any of the elements
-     * in {@code elements} is {@code null}.
-     */
-    default long byteOffset(PathElement... elements) {
-        return Utils.bitsToBytesOrThrow(bitOffset(elements), Utils.bitsToBytesThrowOffset);
-    }
-
-    /**
-     * Creates a method handle that can be used to compute the offset, in bytes, of the layout selected
-     * by a given layout path, where the path is considered rooted in this layout.
-     *
-     * <p>The returned method handle has a return type of {@code long}, and features as many {@code long}
-     * parameter types as there are free dimensions in the provided layout path (see {@link PathElement#sequenceElement()},
-     * where the order of the parameters corresponds to the order of the path elements.
-     * The returned method handle can be used to compute a layout offset similar to {@link #byteOffset(PathElement...)},
-     * but where some sequence indices are specified only when invoking the method handle.
-     *
-     * <p>The final offset returned by the method handle is computed as follows:
-     *
-     * <blockquote><pre>{@code
-    bitOffset = c_1 + c_2 + ... + c_m + (x_1 * s_1) + (x_2 * s_2) + ... + (x_n * s_n)
-    offset = bitOffset / 8
-     * }</pre></blockquote>
-     *
-     * where {@code x_1}, {@code x_2}, ... {@code x_n} are <em>dynamic</em> values provided as {@code long}
-     * arguments, whereas {@code c_1}, {@code c_2}, ... {@code c_m} and {@code s_0}, {@code s_1}, ... {@code s_n} are
-     * <em>static</em> stride constants which are derived from the layout path.
-     *
-     * <p>The method handle will throw an {@link UnsupportedOperationException} if the computed
-     * offset in bits is not a multiple of 8.
-     *
-     * @param elements the layout path elements.
-     * @return a method handle that can be used to compute the byte offset of the layout element
-     * specified by the given layout path elements, when supplied with the missing sequence element indices.
-     * @throws IllegalArgumentException if the layout path contains one or more path elements that select
-     * multiple sequence element indices (see {@link PathElement#sequenceElement(long, long)}).
-     * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size.
-     */
-    default MethodHandle byteOffsetHandle(PathElement... elements) {
-        MethodHandle mh = bitOffsetHandle(elements);
-        mh = MethodHandles.filterReturnValue(mh, Utils.MH_bitsToBytesOrThrowForOffset);
-        return mh;
-    }
-
-    /**
-     * Creates a memory access var handle that can be used to dereference memory at the layout selected by a given layout path,
-     * where the path is considered rooted in this layout.
-     * <p>
-     * The final memory location accessed by the returned memory access var handle can be computed as follows:
-     *
-     * <blockquote><pre>{@code
-    address = base + offset
-     * }</pre></blockquote>
-     *
-     * where {@code base} denotes the base address expressed by the {@link MemorySegment} access coordinate
-     * (see {@link MemorySegment#address()} and {@link MemoryAddress#toRawLongValue()}) and {@code offset}
-     * can be expressed in the following form:
-     *
-     * <blockquote><pre>{@code
-    offset = c_1 + c_2 + ... + c_m + (x_1 * s_1) + (x_2 * s_2) + ... + (x_n * s_n)
-     * }</pre></blockquote>
-     *
-     * where {@code x_1}, {@code x_2}, ... {@code x_n} are <em>dynamic</em> values provided as optional {@code long}
-     * access coordinates, whereas {@code c_1}, {@code c_2}, ... {@code c_m} and {@code s_0}, {@code s_1}, ... {@code s_n} are
-     * <em>static</em> stride constants which are derived from the layout path.
-     *
-     * @apiNote the resulting var handle will feature an additional {@code long} access coordinate for every
-     * unspecified sequence access component contained in this layout path. Moreover, the resulting var handle
-     * features certain <a href="MemoryHandles.html#memaccess-mode">access mode restrictions</a>, which are common to all memory access var handles.
-     *
-     * @param carrier the var handle carrier type.
-     * @param elements the layout path elements.
-     * @return a var handle which can be used to dereference memory at the (possibly nested) layout selected by the layout path in {@code elements}.
-     * @throws UnsupportedOperationException if the layout path has one or more elements with incompatible alignment constraints,
-     * or if one of the layouts traversed by the layout path has unspecified size.
-     * @throws IllegalArgumentException if the carrier does not represent a primitive type, if the carrier is {@code void},
-     * {@code boolean}, or if the layout path in {@code elements} does not select a value layout (see {@link ValueLayout}),
-     * or if the selected value layout has a size that that does not match that of the specified carrier type.
-     */
-    default VarHandle varHandle(Class<?> carrier, PathElement... elements) {
-        Objects.requireNonNull(carrier);
-        return computePathOp(LayoutPathImpl.rootPath(this, MemoryLayout::bitSize), path -> path.dereferenceHandle(carrier),
-                Set.of(), elements);
-    }
-
-    /**
-     * Selects the layout from a path rooted in this layout.
-     *
-     * @param elements the layout path elements.
-     * @return the layout selected by the layout path in {@code elements}.
-     * @throws IllegalArgumentException if the layout path does not select any layout nested in this layout,
-     * or if the layout path contains one or more path elements that select one or more sequence element indices
-     * (see {@link PathElement#sequenceElement(long)} and {@link PathElement#sequenceElement(long, long)}).
-     */
-    default MemoryLayout select(PathElement... elements) {
-        return computePathOp(LayoutPathImpl.rootPath(this, l -> 0L), LayoutPathImpl::layout,
-                EnumSet.of(PathKind.SEQUENCE_ELEMENT_INDEX, PathKind.SEQUENCE_RANGE), elements);
-    }
-
-    /**
-     * Creates a transformed copy of this layout where a selected layout, from a path rooted in this layout,
-     * is replaced with the result of applying the given operation.
-     *
-     * @param op the unary operation to be applied to the selected layout.
-     * @param elements the layout path elements.
-     * @return a new layout where the layout selected by the layout path in {@code elements},
-     * has been replaced by the result of applying {@code op} to the selected layout.
-     * @throws IllegalArgumentException if the layout path does not select any layout nested in this layout,
-     * or if the layout path contains one or more path elements that select one or more sequence element indices
-     * (see {@link PathElement#sequenceElement(long)} and {@link PathElement#sequenceElement(long, long)}).
-     */
-    default MemoryLayout map(UnaryOperator<MemoryLayout> op, PathElement... elements) {
-        Objects.requireNonNull(op);
-        return computePathOp(LayoutPathImpl.rootPath(this, l -> 0L), path -> path.map(op),
-                EnumSet.of(PathKind.SEQUENCE_ELEMENT_INDEX, PathKind.SEQUENCE_RANGE), elements);
-    }
-
-    private static <Z> Z computePathOp(LayoutPathImpl path, Function<LayoutPathImpl, Z> finalizer,
-                                       Set<LayoutPathImpl.PathElementImpl.PathKind> badKinds, PathElement... elements) {
-        Objects.requireNonNull(elements);
-        for (PathElement e : elements) {
-            LayoutPathImpl.PathElementImpl pathElem = (LayoutPathImpl.PathElementImpl)Objects.requireNonNull(e);
-            if (badKinds.contains(pathElem.kind())) {
-                throw new IllegalArgumentException(String.format("Invalid %s selection in layout path", pathElem.kind().description()));
-            }
-            path = pathElem.apply(path);
-        }
-        return finalizer.apply(path);
-    }
-
-    /**
      * Is this a padding layout (e.g. a layout created from {@link #ofPaddingBits(long)}) ?
      * @return true, if this layout is a padding layout.
      */
     boolean isPadding();
-
-    interface LayoutPath {
-        VarHandle varHandle(Class<?> clazz);
-        int freeDimensions();
-    }
-
-    default LayoutPath path(PathElement... elements) {
-        LayoutPathImpl path = LayoutPathImpl.rootPath(this, l -> 0L);
-        Objects.requireNonNull(elements);
-        for (PathElement e : elements) {
-            LayoutPathImpl.PathElementImpl pathElem = (LayoutPathImpl.PathElementImpl)Objects.requireNonNull(e);
-            path = pathElem.apply(path);
-        }
-        return path;
-    }
 
     /**
      * Instances of this class are used to form <a href="MemoryLayout.html#layout-paths"><em>layout paths</em></a>. There
@@ -580,7 +370,174 @@ public interface MemoryLayout extends Constable {
      * @implSpec
      * Implementations of this interface are immutable and thread-safe.
      */
-    interface PathElement {
+    interface Path {
+
+        /**
+         * Selects the layout from a path rooted in this layout.
+         *
+         * @param elements the layout path elements.
+         * @return the layout selected by the layout path in {@code elements}.
+         * @throws IllegalArgumentException if the layout path does not select any layout nested in this layout,
+         * or if the layout path contains one or more path elements that select one or more sequence element indices
+         * (see {@link PathElement#sequenceElement(long)} and {@link PathElement#sequenceElement(long, long)}).
+         */
+        MemoryLayout layout();
+
+        /**
+         * Returns the number of free dimensions in this layout path.
+         * @return the number of free dimensions in this layout path.
+         */
+        int freeDimensions();
+
+        /**
+         * Creates a memory access var handle that can be used to dereference memory at the layout selected by a given layout path,
+         * where the path is considered rooted in this layout.
+         * <p>
+         * The final memory location accessed by the returned memory access var handle can be computed as follows:
+         *
+         * <blockquote><pre>{@code
+        address = base + offset
+         * }</pre></blockquote>
+         *
+         * where {@code base} denotes the base address expressed by the {@link MemorySegment} access coordinate
+         * (see {@link MemorySegment#address()} and {@link MemoryAddress#toRawLongValue()}) and {@code offset}
+         * can be expressed in the following form:
+         *
+         * <blockquote><pre>{@code
+        offset = c_1 + c_2 + ... + c_m + (x_1 * s_1) + (x_2 * s_2) + ... + (x_n * s_n)
+         * }</pre></blockquote>
+         *
+         * where {@code x_1}, {@code x_2}, ... {@code x_n} are <em>dynamic</em> values provided as optional {@code long}
+         * access coordinates, whereas {@code c_1}, {@code c_2}, ... {@code c_m} and {@code s_0}, {@code s_1}, ... {@code s_n} are
+         * <em>static</em> stride constants which are derived from the layout path.
+         *
+         * @apiNote the resulting var handle will feature an additional {@code long} access coordinate for every
+         * unspecified sequence access component contained in this layout path. Moreover, the resulting var handle
+         * features certain <a href="MemoryHandles.html#memaccess-mode">access mode restrictions</a>, which are common to all memory access var handles.
+         *
+         * @param carrier the var handle carrier type.
+         * @param elements the layout path elements.
+         * @return a var handle which can be used to dereference memory at the (possibly nested) layout selected by the layout path in {@code elements}.
+         * @throws UnsupportedOperationException if the layout path has one or more elements with incompatible alignment constraints,
+         * or if one of the layouts traversed by the layout path has unspecified size.
+         * @throws IllegalArgumentException if the carrier does not represent a primitive type, if the carrier is {@code void},
+         * {@code boolean}, or if the layout path in {@code elements} does not select a value layout (see {@link ValueLayout}),
+         * or if the selected value layout has a size that that does not match that of the specified carrier type.
+         */
+        VarHandle varHandle(Class<?> clazz);
+
+        /**
+         * Creates a transformed copy of this layout where a selected layout, from a path rooted in this layout,
+         * is replaced with the result of applying the given operation.
+         *
+         * @param op the unary operation to be applied to the selected layout.
+         * @param elements the layout path elements.
+         * @return a new layout where the layout selected by the layout path in {@code elements},
+         * has been replaced by the result of applying {@code op} to the selected layout.
+         * @throws IllegalArgumentException if the layout path does not select any layout nested in this layout,
+         * or if the layout path contains one or more path elements that select one or more sequence element indices
+         * (see {@link PathElement#sequenceElement(long)} and {@link PathElement#sequenceElement(long, long)}).
+         */
+        MemoryLayout map(UnaryOperator<MemoryLayout> op);
+
+        /**
+         * Computes the offset, in bits, of the layout selected by a given layout path, where the path is considered rooted in this
+         * layout.
+         *
+         * @param elements the layout path elements.
+         * @return The offset, in bits, of the layout selected by the layout path in {@code elements}.
+         * @throws IllegalArgumentException if the layout path does not select any layout nested in this layout, or if the
+         * layout path contains one or more path elements that select multiple sequence element indices
+         * (see {@link PathElement#sequenceElement()} and {@link PathElement#sequenceElement(long, long)}).
+         * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size.
+         * @throws NullPointerException if either {@code elements == null}, or if any of the elements
+         * in {@code elements} is {@code null}.
+         */
+        long bitOffset();
+
+        /**
+         * Creates a method handle that can be used to compute the offset, in bits, of the layout selected
+         * by a given layout path, where the path is considered rooted in this layout.
+         *
+         * <p>The returned method handle has a return type of {@code long}, and features as many {@code long}
+         * parameter types as there are free dimensions in the provided layout path (see {@link PathElement#sequenceElement()},
+         * where the order of the parameters corresponds to the order of the path elements.
+         * The returned method handle can be used to compute a layout offset similar to {@link #bitOffset(PathElement...)},
+         * but where some sequence indices are specified only when invoking the method handle.
+         *
+         * <p>The final offset returned by the method handle is computed as follows:
+         *
+         * <blockquote><pre>{@code
+        offset = c_1 + c_2 + ... + c_m + (x_1 * s_1) + (x_2 * s_2) + ... + (x_n * s_n)
+         * }</pre></blockquote>
+         *
+         * where {@code x_1}, {@code x_2}, ... {@code x_n} are <em>dynamic</em> values provided as {@code long}
+         * arguments, whereas {@code c_1}, {@code c_2}, ... {@code c_m} and {@code s_0}, {@code s_1}, ... {@code s_n} are
+         * <em>static</em> stride constants which are derived from the layout path.
+         *
+         * @param elements the layout path elements.
+         * @return a method handle that can be used to compute the bit offset of the layout element
+         * specified by the given layout path elements, when supplied with the missing sequence element indices.
+         * @throws IllegalArgumentException if the layout path contains one or more path elements that select
+         * multiple sequence element indices (see {@link PathElement#sequenceElement(long, long)}).
+         * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size.
+         */
+        MethodHandle bitOffsetHandle();
+
+        /**
+         * Computes the offset, in bytes, of the layout selected by a given layout path, where the path is considered rooted in this
+         * layout.
+         *
+         * @param elements the layout path elements.
+         * @return The offset, in bytes, of the layout selected by the layout path in {@code elements}.
+         * @throws IllegalArgumentException if the layout path does not select any layout nested in this layout, or if the
+         * layout path contains one or more path elements that select multiple sequence element indices
+         * (see {@link PathElement#sequenceElement()} and {@link PathElement#sequenceElement(long, long)}).
+         * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size,
+         * or if {@code bitOffset(elements)} is not a multiple of 8.
+         * @throws NullPointerException if either {@code elements == null}, or if any of the elements
+         * in {@code elements} is {@code null}.
+         */
+        default long byteOffset() {
+            return Utils.bitsToBytesOrThrow(bitOffset(), Utils.bitsToBytesThrowOffset);
+        }
+
+        /**
+         * Creates a method handle that can be used to compute the offset, in bytes, of the layout selected
+         * by a given layout path, where the path is considered rooted in this layout.
+         *
+         * <p>The returned method handle has a return type of {@code long}, and features as many {@code long}
+         * parameter types as there are free dimensions in the provided layout path (see {@link PathElement#sequenceElement()},
+         * where the order of the parameters corresponds to the order of the path elements.
+         * The returned method handle can be used to compute a layout offset similar to {@link #byteOffset(PathElement...)},
+         * but where some sequence indices are specified only when invoking the method handle.
+         *
+         * <p>The final offset returned by the method handle is computed as follows:
+         *
+         * <blockquote><pre>{@code
+        bitOffset = c_1 + c_2 + ... + c_m + (x_1 * s_1) + (x_2 * s_2) + ... + (x_n * s_n)
+        offset = bitOffset / 8
+         * }</pre></blockquote>
+         *
+         * where {@code x_1}, {@code x_2}, ... {@code x_n} are <em>dynamic</em> values provided as {@code long}
+         * arguments, whereas {@code c_1}, {@code c_2}, ... {@code c_m} and {@code s_0}, {@code s_1}, ... {@code s_n} are
+         * <em>static</em> stride constants which are derived from the layout path.
+         *
+         * <p>The method handle will throw an {@link UnsupportedOperationException} if the computed
+         * offset in bits is not a multiple of 8.
+         *
+         * @param elements the layout path elements.
+         * @return a method handle that can be used to compute the byte offset of the layout element
+         * specified by the given layout path elements, when supplied with the missing sequence element indices.
+         * @throws IllegalArgumentException if the layout path contains one or more path elements that select
+         * multiple sequence element indices (see {@link PathElement#sequenceElement(long, long)}).
+         * @throws UnsupportedOperationException if one of the layouts traversed by the layout path has unspecified size.
+         */
+        default MethodHandle byteOffsetHandle() {
+            MethodHandle mh = bitOffsetHandle();
+            mh = MethodHandles.filterReturnValue(mh, Utils.MH_bitsToBytesOrThrowForOffset);
+            return mh;
+        }
 
         /**
          * Returns a path element which selects a member layout with given name from a given group layout.
@@ -593,11 +550,7 @@ public interface MemoryLayout extends Constable {
          * @param name the name of the group element to be selected.
          * @return a path element which selects the group element with given name.
          */
-        static PathElement groupElement(String name) {
-            Objects.requireNonNull(name);
-            return new LayoutPathImpl.PathElementImpl(LayoutPathImpl.PathElementImpl.PathKind.GROUP_ELEMENT,
-                                                  path -> path.groupElement(name));
-        }
+        Path groupElement(String name);
 
         /**
          * Returns a path element which selects the element layout at the specified position in a given the sequence layout.
@@ -608,13 +561,7 @@ public interface MemoryLayout extends Constable {
          * @return a path element which selects the sequence element layout with given index.
          * @throws IllegalArgumentException if {@code index < 0}.
          */
-        static PathElement sequenceElement(long index) {
-            if (index < 0) {
-                throw new IllegalArgumentException("Index must be positive: " + index);
-            }
-            return new LayoutPathImpl.PathElementImpl(LayoutPathImpl.PathElementImpl.PathKind.SEQUENCE_ELEMENT_INDEX,
-                                                  path -> path.sequenceElement(index));
-        }
+        Path sequenceElement(long index);
 
         /**
          * Returns a path element which selects the element layout in a <em>range</em> of positions in a given the sequence layout,
@@ -625,7 +572,7 @@ public interface MemoryLayout extends Constable {
          * with this path is bound by an index {@code I}, the resulting accessed offset can be obtained with the following
          * formula:
          * <blockquote><pre>{@code
-E * (S + I * F)
+        E * (S + I * F)
          * }</pre></blockquote>
          * where {@code E} is the size (in bytes) of the sequence element layout.
          *
@@ -634,16 +581,7 @@ E * (S + I * F)
          * @return a path element which selects the sequence element layout with given index.
          * @throws IllegalArgumentException if {@code start < 0}, or {@code step == 0}.
          */
-        static PathElement sequenceElement(long start, long step) {
-            if (start < 0) {
-                throw new IllegalArgumentException("Start index must be positive: " + start);
-            }
-            if (step == 0) {
-                throw new IllegalArgumentException("Step must be != 0: " + step);
-            }
-            return new LayoutPathImpl.PathElementImpl(LayoutPathImpl.PathElementImpl.PathKind.SEQUENCE_RANGE,
-                                                  path -> path.sequenceElement(start, step));
-        }
+        Path sequenceElement(long start, long step);
 
         /**
          * Returns a path element which selects an unspecified element layout from a given sequence layout.
@@ -652,10 +590,11 @@ E * (S + I * F)
          *
          * @return a path element which selects an unspecified sequence element layout.
          */
-        static PathElement sequenceElement() {
-            return new LayoutPathImpl.PathElementImpl(LayoutPathImpl.PathElementImpl.PathKind.SEQUENCE_ELEMENT,
-                                                  LayoutPathImpl::sequenceElement);
-        }
+        Path sequenceElement();
+    }
+
+    default Path path() {
+        return LayoutPathImpl.rootPath(this);
     }
 
     /**

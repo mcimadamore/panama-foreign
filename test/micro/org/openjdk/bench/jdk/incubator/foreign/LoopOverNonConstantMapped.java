@@ -49,7 +49,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.concurrent.TimeUnit;
 
-import static jdk.incubator.foreign.MemoryLayout.PathElement.sequenceElement;
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -80,7 +79,7 @@ public class LoopOverNonConstantMapped {
         }
     }
 
-    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).varHandle(int.class, sequenceElement());
+    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).path().sequenceElement().varHandle(int.class);
     MemorySegment segment;
     long unsafe_addr;
 

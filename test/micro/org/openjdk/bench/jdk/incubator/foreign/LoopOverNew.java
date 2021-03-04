@@ -41,7 +41,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.TimeUnit;
 
-import static jdk.incubator.foreign.MemoryLayout.PathElement.sequenceElement;
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -58,7 +57,7 @@ public class LoopOverNew {
     static final int CARRIER_SIZE = (int)JAVA_INT.byteSize();
     static final int ALLOC_SIZE = ELEM_SIZE * CARRIER_SIZE;
 
-    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).varHandle(int.class, sequenceElement());
+    static final VarHandle VH_int = MemoryLayout.ofSequence(JAVA_INT).path().sequenceElement().varHandle(int.class);
 
     @Benchmark
     public void unsafe_loop() {

@@ -33,7 +33,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 
 import static java.lang.invoke.MethodType.methodType;
-import static jdk.incubator.foreign.MemoryLayout.PathElement.groupElement;
 import static jdk.incubator.foreign.CLinker.*;
 
 public class PanamaPoint implements AutoCloseable {
@@ -43,8 +42,8 @@ public class PanamaPoint implements AutoCloseable {
         C_INT.withName("y")
     );
 
-    private static final VarHandle VH_x = LAYOUT.varHandle(int.class, groupElement("x"));
-    private static final VarHandle VH_y = LAYOUT.varHandle(int.class, groupElement("y"));
+    private static final VarHandle VH_x = LAYOUT.path().groupElement("x").varHandle(int.class);
+    private static final VarHandle VH_y = LAYOUT.path().groupElement("y").varHandle(int.class);
     private static final MethodHandle MH_distance;
     private static final MethodHandle MH_distance_ptrs;
 

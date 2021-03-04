@@ -40,7 +40,6 @@ import java.util.Objects;
 
 import static jdk.internal.foreign.PlatformLayouts.SysV;
 import static jdk.incubator.foreign.CLinker.VaList;
-import static jdk.incubator.foreign.MemoryLayout.PathElement.groupElement;
 import static jdk.internal.foreign.abi.SharedUtils.SimpleVaArg;
 import static jdk.internal.foreign.abi.SharedUtils.checkCompatibleType;
 import static jdk.internal.foreign.abi.SharedUtils.vhPrimitiveOrAddress;
@@ -97,7 +96,7 @@ public class SysVVaList implements VaList {
 //        FP_REG.withName("%xmm15")
     );
 
-    private static final long FP_OFFSET = LAYOUT_REG_SAVE_AREA.byteOffset(groupElement("%xmm0"));
+    private static final long FP_OFFSET = LAYOUT_REG_SAVE_AREA.path().groupElement("%xmm0").byteOffset();
 
     private static final int GP_SLOT_SIZE = (int) GP_REG.byteSize();
     private static final int FP_SLOT_SIZE = (int) FP_REG.byteSize();
@@ -105,12 +104,16 @@ public class SysVVaList implements VaList {
     private static final int MAX_GP_OFFSET = (int) FP_OFFSET; // 6 regs used
     private static final int MAX_FP_OFFSET = (int) LAYOUT_REG_SAVE_AREA.byteSize(); // 8 16 byte regs
 
-    private static final VarHandle VH_fp_offset = LAYOUT.varHandle(int.class, groupElement("fp_offset"));
-    private static final VarHandle VH_gp_offset = LAYOUT.varHandle(int.class, groupElement("gp_offset"));
-    private static final VarHandle VH_overflow_arg_area
-        = MemoryHandles.asAddressVarHandle(LAYOUT.varHandle(long.class, groupElement("overflow_arg_area")));
-    private static final VarHandle VH_reg_save_area
-        = MemoryHandles.asAddressVarHandle(LAYOUT.varHandle(long.class, groupElement("reg_save_area")));
+    private static final VarHandle VH_fp_offset = LAYOUT.path()
+            .groupElement("fp_offset")
+            .varHandle(int.class);
+    private static final VarHandle VH_gp_offset = LAYOUT.path()
+            .groupElement("gp_offset")
+            .varHandle(int.class);
+    private static final VarHandle VH_overflow_arg_area = MemoryHandles.asAddressVarHandle(
+            LAYOUT.path().groupElement("overflow_arg_area").varHandle(long.class));
+    private static final VarHandle VH_reg_save_area =MemoryHandles.asAddressVarHandle(
+            LAYOUT.path().groupElement("reg_save_area").varHandle(long.class));
 
     private static final Cleaner cleaner = Cleaner.create();
     private static final VaList EMPTY = new SharedUtils.EmptyVaList(emptyListAddress());
@@ -280,7 +283,7 @@ public class SysVVaList implements VaList {
                     yield res;
                 }
                 case FLOAT -> {
-                    VarHandle reader = layout.varHandle(carrier);
+                    VarHandle reader = layout.path().varHandle(carrier);
                     Object res = reader.get(regSaveArea.asSlice(currentFPOffset()));
                     currentFPOffset(currentFPOffset() + FP_SLOT_SIZE);
                     yield res;
@@ -433,7 +436,7 @@ public class SysVVaList implements VaList {
                         currentGPOffset += GP_SLOT_SIZE;
                     }
                     case FLOAT -> {
-                        VarHandle writer = layout.varHandle(carrier);
+                        VarHandle writer = layout.path().varHandle(carrier);
                         writer.set(reg_save_area.asSlice(currentFPOffset), value);
                         currentFPOffset += FP_SLOT_SIZE;
                     }

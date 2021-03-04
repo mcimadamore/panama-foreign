@@ -411,8 +411,8 @@ public class SharedUtils {
 
     public static VarHandle vhPrimitiveOrAddress(Class<?> carrier, MemoryLayout layout) {
         return carrier == MemoryAddress.class
-            ? MemoryHandles.asAddressVarHandle(layout.varHandle(primitiveCarrierForSize(layout.byteSize(), false)))
-            : layout.varHandle(carrier);
+            ? MemoryHandles.asAddressVarHandle(layout.path().varHandle(primitiveCarrierForSize(layout.byteSize(), false)))
+            : layout.path().varHandle(carrier);
     }
 
     public static VaList newVaListOfAddress(MemoryAddress ma) {
@@ -527,8 +527,8 @@ public class SharedUtils {
 
         public VarHandle varHandle() {
             return carrier == MemoryAddress.class
-                ? MemoryHandles.asAddressVarHandle(layout.varHandle(primitiveCarrierForSize(layout.byteSize(), false)))
-                : layout.varHandle(carrier);
+                ? MemoryHandles.asAddressVarHandle(layout.path().varHandle(primitiveCarrierForSize(layout.byteSize(), false)))
+                : layout.path().varHandle(carrier);
         }
     }
 

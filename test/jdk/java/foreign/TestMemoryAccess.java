@@ -32,7 +32,6 @@
 import jdk.incubator.foreign.GroupLayout;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemoryLayout;
-import jdk.incubator.foreign.MemoryLayout.PathElement;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.SequenceLayout;
 import jdk.incubator.foreign.ValueLayout;
@@ -48,37 +47,37 @@ public class TestMemoryAccess {
     @Test(dataProvider = "elements")
     public void testAccess(Function<MemorySegment, MemorySegment> viewFactory, ValueLayout elemLayout, Class<?> carrier, Checker checker) {
         ValueLayout layout = elemLayout.withName("elem");
-        testAccessInternal(viewFactory, layout, layout.varHandle(carrier), checker);
+        testAccessInternal(viewFactory, layout, layout.path().varHandle(carrier), checker);
     }
 
     @Test(dataProvider = "elements")
     public void testPaddedAccessByName(Function<MemorySegment, MemorySegment> viewFactory, MemoryLayout elemLayout, Class<?> carrier, Checker checker) {
         GroupLayout layout = MemoryLayout.ofStruct(MemoryLayout.ofPaddingBits(elemLayout.bitSize()), elemLayout.withName("elem"));
-        testAccessInternal(viewFactory, layout, layout.varHandle(carrier, PathElement.groupElement("elem")), checker);
+        testAccessInternal(viewFactory, layout, layout.path().groupElement("elem").varHandle(carrier), checker);
     }
 
     @Test(dataProvider = "elements")
     public void testPaddedAccessByIndexSeq(Function<MemorySegment, MemorySegment> viewFactory, MemoryLayout elemLayout, Class<?> carrier, Checker checker) {
         SequenceLayout layout = MemoryLayout.ofSequence(2, elemLayout);
-        testAccessInternal(viewFactory, layout, layout.varHandle(carrier, PathElement.sequenceElement(1)), checker);
+        testAccessInternal(viewFactory, layout, layout.path().sequenceElement(1).varHandle(carrier), checker);
     }
 
     @Test(dataProvider = "arrayElements")
     public void testArrayAccess(Function<MemorySegment, MemorySegment> viewFactory, MemoryLayout elemLayout, Class<?> carrier, ArrayChecker checker) {
         SequenceLayout seq = MemoryLayout.ofSequence(10, elemLayout.withName("elem"));
-        testArrayAccessInternal(viewFactory, seq, seq.varHandle(carrier, PathElement.sequenceElement()), checker);
+        testArrayAccessInternal(viewFactory, seq, seq.path().sequenceElement().varHandle(carrier), checker);
     }
 
     @Test(dataProvider = "arrayElements")
     public void testPaddedArrayAccessByName(Function<MemorySegment, MemorySegment> viewFactory, MemoryLayout elemLayout, Class<?> carrier, ArrayChecker checker) {
         SequenceLayout seq = MemoryLayout.ofSequence(10, MemoryLayout.ofStruct(MemoryLayout.ofPaddingBits(elemLayout.bitSize()), elemLayout.withName("elem")));
-        testArrayAccessInternal(viewFactory, seq, seq.varHandle(carrier, MemoryLayout.PathElement.sequenceElement(), MemoryLayout.PathElement.groupElement("elem")), checker);
+        testArrayAccessInternal(viewFactory, seq, seq.path().sequenceElement().groupElement("elem").varHandle(carrier), checker);
     }
 
     @Test(dataProvider = "arrayElements")
     public void testPaddedArrayAccessByIndexSeq(Function<MemorySegment, MemorySegment> viewFactory, MemoryLayout elemLayout, Class<?> carrier, ArrayChecker checker) {
         SequenceLayout seq = MemoryLayout.ofSequence(10, MemoryLayout.ofSequence(2, elemLayout));
-        testArrayAccessInternal(viewFactory, seq, seq.varHandle(carrier, PathElement.sequenceElement(), MemoryLayout.PathElement.sequenceElement(1)), checker);
+        testArrayAccessInternal(viewFactory, seq, seq.path().sequenceElement().sequenceElement(1).varHandle(carrier), checker);
     }
 
     private void testAccessInternal(Function<MemorySegment, MemorySegment> viewFactory, MemoryLayout layout, VarHandle handle, Checker checker) {
@@ -149,8 +148,8 @@ public class TestMemoryAccess {
     public void testMatrixAccess(Function<MemorySegment, MemorySegment> viewFactory, MemoryLayout elemLayout, Class<?> carrier, MatrixChecker checker) {
         SequenceLayout seq = MemoryLayout.ofSequence(20,
                 MemoryLayout.ofSequence(10, elemLayout.withName("elem")));
-        testMatrixAccessInternal(viewFactory, seq, seq.varHandle(carrier,
-                PathElement.sequenceElement(), PathElement.sequenceElement()), checker);
+        testMatrixAccessInternal(viewFactory, seq, seq.path().sequenceElement().sequenceElement().varHandle(carrier),
+                checker);
     }
 
     @Test(dataProvider = "matrixElements")
@@ -158,8 +157,7 @@ public class TestMemoryAccess {
         SequenceLayout seq = MemoryLayout.ofSequence(20,
                 MemoryLayout.ofSequence(10, MemoryLayout.ofStruct(MemoryLayout.ofPaddingBits(elemLayout.bitSize()), elemLayout.withName("elem"))));
         testMatrixAccessInternal(viewFactory, seq,
-                seq.varHandle(carrier,
-                        PathElement.sequenceElement(), PathElement.sequenceElement(), PathElement.groupElement("elem")),
+                seq.path().sequenceElement().sequenceElement().groupElement("elem").varHandle(carrier),
                 checker);
     }
 
@@ -168,8 +166,7 @@ public class TestMemoryAccess {
         SequenceLayout seq = MemoryLayout.ofSequence(20,
                 MemoryLayout.ofSequence(10, MemoryLayout.ofSequence(2, elemLayout)));
         testMatrixAccessInternal(viewFactory, seq,
-                seq.varHandle(carrier,
-                        PathElement.sequenceElement(), PathElement.sequenceElement(), PathElement.sequenceElement(1)),
+                seq.path().sequenceElement().sequenceElement().sequenceElement(1).varHandle(carrier),
                 checker);
     }
 
@@ -177,7 +174,7 @@ public class TestMemoryAccess {
           expectedExceptions = IllegalArgumentException.class)
     public void testBadCarriers(Class<?> carrier) {
         ValueLayout l = MemoryLayouts.BITS_32_LE.withName("elem");
-        l.varHandle(carrier);
+        l.path().varHandle(carrier);
     }
 
     private void testMatrixAccessInternal(Function<MemorySegment, MemorySegment> viewFactory, SequenceLayout seq, VarHandle handle, MatrixChecker checker) {

@@ -86,8 +86,8 @@ public class TestAdaptVarHandles {
 
     static final VarHandle VH_box_int = MemoryHandles.filterValue(VH_int, INTBOX_TO_INT, INT_TO_INTBOX);
 
-    static final VarHandle VH_addr_int = MemoryLayout.ofSequence(MemoryLayouts.JAVA_INT)
-            .varHandle(int.class, MemoryLayout.PathElement.sequenceElement());
+    static final VarHandle VH_addr_int = MemoryLayout.ofSequence(MemoryLayouts.JAVA_INT).path()
+            .sequenceElement().varHandle(int.class);
 
     static final VarHandle VH_addr_box_int = MemoryHandles.filterValue(VH_addr_int, INTBOX_TO_INT, INT_TO_INTBOX);
 

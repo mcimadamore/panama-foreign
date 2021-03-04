@@ -40,7 +40,6 @@ import sun.misc.Unsafe;
 import java.lang.invoke.VarHandle;
 import java.util.concurrent.TimeUnit;
 
-import static jdk.incubator.foreign.MemoryLayout.PathElement.sequenceElement;
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -61,7 +60,7 @@ public class LoopOverPollutedSegments {
     byte[] arr;
     long addr;
 
-    static final VarHandle intHandle = MemoryLayout.ofSequence(JAVA_INT).varHandle(int.class, MemoryLayout.PathElement.sequenceElement());
+    static final VarHandle intHandle = MemoryLayout.ofSequence(JAVA_INT).path().sequenceElement().varHandle(int.class);
 
 
     @Setup
