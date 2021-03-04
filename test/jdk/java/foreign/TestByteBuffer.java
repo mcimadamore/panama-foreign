@@ -35,7 +35,6 @@ import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemorySegment;
-import jdk.incubator.foreign.MemoryLayout.PathElement;
 import jdk.incubator.foreign.SequenceLayout;
 
 import java.io.File;
@@ -133,8 +132,8 @@ public class TestByteBuffer {
             MemoryLayouts.BITS_64_BE
     );
 
-    static VarHandle indexHandle = tuples.varHandle(int.class, PathElement.sequenceElement(), PathElement.groupElement("index"));
-    static VarHandle valueHandle = tuples.varHandle(float.class, PathElement.sequenceElement(), PathElement.groupElement("value"));
+    static VarHandle indexHandle = tuples.path().sequenceElement().groupElement("index").varHandle(int.class);
+    static VarHandle valueHandle = tuples.path().sequenceElement().groupElement("value").varHandle(float.class);
 
     static void initTuples(MemorySegment base, long count) {
         for (long i = 0; i < count ; i++) {

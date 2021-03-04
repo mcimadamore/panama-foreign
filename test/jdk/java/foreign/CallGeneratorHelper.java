@@ -54,7 +54,7 @@ public class CallGeneratorHelper extends NativeTestHelper {
         GroupLayout g = (GroupLayout) layout;
         for (MemoryLayout field : g.memberLayouts()) {
             if (field instanceof ValueLayout) {
-                VarHandle vh = g.varHandle(vhCarrier(field), MemoryLayout.PathElement.groupElement(field.name().orElseThrow()));
+                VarHandle vh = g.path().groupElement(field.name().orElseThrow()).varHandle(vhCarrier(field));
                 assertEquals(vh.get(actual), vh.get(expected));
             }
         }
@@ -401,7 +401,7 @@ public class CallGeneratorHelper extends NativeTestHelper {
     static void initStruct(MemorySegment str, GroupLayout g, List<Consumer<Object>> checks, boolean check, List<MemorySegment> segments) throws ReflectiveOperationException {
         for (MemoryLayout l : g.memberLayouts()) {
             if (l.isPadding()) continue;
-            VarHandle accessor = g.varHandle(structFieldCarrier(l), MemoryLayout.PathElement.groupElement(l.name().get()));
+            VarHandle accessor = g.path().groupElement(l.name().get()).varHandle(structFieldCarrier(l));
             List<Consumer<Object>> fieldsCheck = new ArrayList<>();
             Object value = makeArg(l, fieldsCheck, check, segments);
             if (isPointer(l)) {

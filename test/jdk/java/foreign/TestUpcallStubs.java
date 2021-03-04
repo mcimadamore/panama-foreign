@@ -63,7 +63,7 @@ public class TestUpcallStubs {
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testNoAccess() {
         try (MemorySegment stub = getStub()) {
-            VarHandle vh = JAVA_INT.varHandle(int.class);
+            VarHandle vh = JAVA_INT.path().varHandle(int.class);
             vh.set(stub, 10);
         }
     }

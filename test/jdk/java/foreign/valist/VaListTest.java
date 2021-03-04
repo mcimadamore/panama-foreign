@@ -62,7 +62,6 @@ import static jdk.incubator.foreign.CLinker.C_INT;
 import static jdk.incubator.foreign.CLinker.C_LONG_LONG;
 import static jdk.incubator.foreign.CLinker.C_POINTER;
 import static jdk.incubator.foreign.CLinker.C_VA_LIST;
-import static jdk.incubator.foreign.MemoryLayout.PathElement.groupElement;
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 import static jdk.internal.foreign.PlatformLayouts.*;
 import static org.testng.Assert.*;
@@ -239,8 +238,8 @@ public class VaListTest {
                     intLayout.withName("x"),
                     intLayout.withName("y")
             );
-            VarHandle VH_Point_x = pointLayout.varHandle(int.class, groupElement("x"));
-            VarHandle VH_Point_y = pointLayout.varHandle(int.class, groupElement("y"));
+            VarHandle VH_Point_x = pointLayout.path().groupElement("x").varHandle(int.class);
+            VarHandle VH_Point_y = pointLayout.path().groupElement("y").varHandle(int.class);
             return new Object[] { vaListFact, sumStructFact.apply(pointLayout, VH_Point_x, VH_Point_y),
                     pointLayout, VH_Point_x, VH_Point_y  };
         };
@@ -290,8 +289,8 @@ public class VaListTest {
                     longLongLayout.withName("x"),
                     longLongLayout.withName("y")
             );
-            VarHandle VH_BigPoint_x = BigPoint_LAYOUT.varHandle(long.class, groupElement("x"));
-            VarHandle VH_BigPoint_y = BigPoint_LAYOUT.varHandle(long.class, groupElement("y"));
+            VarHandle VH_BigPoint_x = BigPoint_LAYOUT.path().groupElement("x").varHandle(long.class);
+            VarHandle VH_BigPoint_y = BigPoint_LAYOUT.path().groupElement("y").varHandle(long.class);
             return new Object[] { vaListFact, sumBigStructFact.apply(BigPoint_LAYOUT, VH_BigPoint_x, VH_BigPoint_y),
                     BigPoint_LAYOUT, VH_BigPoint_x, VH_BigPoint_y  };
         };
@@ -341,8 +340,8 @@ public class VaListTest {
                     floatLayout.withName("x"),
                     floatLayout.withName("y")
             );
-            VarHandle VH_FloatPoint_x = FloatPoint_LAYOUT.varHandle(float.class, groupElement("x"));
-            VarHandle VH_FloatPoint_y = FloatPoint_LAYOUT.varHandle(float.class, groupElement("y"));
+            VarHandle VH_FloatPoint_x = FloatPoint_LAYOUT.path().groupElement("x").varHandle(float.class);
+            VarHandle VH_FloatPoint_y = FloatPoint_LAYOUT.path().groupElement("y").varHandle(float.class);
             return new Object[] { vaListFact, sumFloatStructFact.apply(FloatPoint_LAYOUT, VH_FloatPoint_x, VH_FloatPoint_y),
                     FloatPoint_LAYOUT, VH_FloatPoint_x, VH_FloatPoint_y  };
         };
@@ -399,9 +398,9 @@ public class VaListTest {
                     longLongLayout.withName("y"),
                     longLongLayout.withName("z")
             );
-            VarHandle VH_HugePoint_x = HugePoint_LAYOUT.varHandle(long.class, groupElement("x"));
-            VarHandle VH_HugePoint_y = HugePoint_LAYOUT.varHandle(long.class, groupElement("y"));
-            VarHandle VH_HugePoint_z = HugePoint_LAYOUT.varHandle(long.class, groupElement("z"));
+            VarHandle VH_HugePoint_x = HugePoint_LAYOUT.path().groupElement("x").varHandle(long.class);
+            VarHandle VH_HugePoint_y = HugePoint_LAYOUT.path().groupElement("y").varHandle(long.class);
+            VarHandle VH_HugePoint_z = HugePoint_LAYOUT.path().groupElement("z").varHandle(long.class);
             return new Object[] { vaListFact,
                     sumBigStructFact.apply(HugePoint_LAYOUT, VH_HugePoint_x, VH_HugePoint_y, VH_HugePoint_z),
                     HugePoint_LAYOUT, VH_HugePoint_x, VH_HugePoint_y, VH_HugePoint_z  };
@@ -653,28 +652,28 @@ public class VaListTest {
                 C_LONG_LONG.withName("x"),
                 C_LONG_LONG.withName("y")
         );
-        VarHandle VH_BigPoint_x = BigPoint_LAYOUT.varHandle(long.class, groupElement("x"));
-        VarHandle VH_BigPoint_y = BigPoint_LAYOUT.varHandle(long.class, groupElement("y"));
+        VarHandle VH_BigPoint_x = BigPoint_LAYOUT.path().groupElement("x").varHandle(long.class);
+        VarHandle VH_BigPoint_y = BigPoint_LAYOUT.path().groupElement("y").varHandle(long.class);
         GroupLayout Point_LAYOUT = MemoryLayout.ofStruct(
                 C_INT.withName("x"),
                 C_INT.withName("y")
         );
-        VarHandle VH_Point_x = Point_LAYOUT.varHandle(int.class, groupElement("x"));
-        VarHandle VH_Point_y = Point_LAYOUT.varHandle(int.class, groupElement("y"));
+        VarHandle VH_Point_x = Point_LAYOUT.path().groupElement("x").varHandle(int.class);
+        VarHandle VH_Point_y = Point_LAYOUT.path().groupElement("y").varHandle(int.class);
         GroupLayout FloatPoint_LAYOUT = MemoryLayout.ofStruct(
                 C_FLOAT.withName("x"),
                 C_FLOAT.withName("y")
         );
-        VarHandle VH_FloatPoint_x = FloatPoint_LAYOUT.varHandle(float.class, groupElement("x"));
-        VarHandle VH_FloatPoint_y = FloatPoint_LAYOUT.varHandle(float.class, groupElement("y"));
+        VarHandle VH_FloatPoint_x = FloatPoint_LAYOUT.path().groupElement("x").varHandle(float.class);
+        VarHandle VH_FloatPoint_y = FloatPoint_LAYOUT.path().groupElement("y").varHandle(float.class);
         GroupLayout HugePoint_LAYOUT = MemoryLayout.ofStruct(
                 C_LONG_LONG.withName("x"),
                 C_LONG_LONG.withName("y"),
                 C_LONG_LONG.withName("z")
         );
-        VarHandle VH_HugePoint_x = HugePoint_LAYOUT.varHandle(long.class, groupElement("x"));
-        VarHandle VH_HugePoint_y = HugePoint_LAYOUT.varHandle(long.class, groupElement("y"));
-        VarHandle VH_HugePoint_z = HugePoint_LAYOUT.varHandle(long.class, groupElement("z"));
+        VarHandle VH_HugePoint_x = HugePoint_LAYOUT.path().groupElement("x").varHandle(long.class);
+        VarHandle VH_HugePoint_y = HugePoint_LAYOUT.path().groupElement("y").varHandle(long.class);
+        VarHandle VH_HugePoint_z = HugePoint_LAYOUT.path().groupElement("z").varHandle(long.class);
 
         return new Object[][]{
                 { linkVaListCB("upcallBigStruct"), VaListConsumer.mh(vaList -> {

@@ -76,7 +76,7 @@ public class TestNulls {
             MemorySegment.class,
             MemoryAddress.class,
             MemoryLayout.class,
-            MemoryLayout.PathElement.class,
+            MemoryLayout.Path.class,
             SequenceLayout.class,
             ValueLayout.class,
             GroupLayout.class,
@@ -143,6 +143,7 @@ public class TestNulls {
         addDefaultMapping(MemoryAddress.class, MemoryAddress.NULL);
         addDefaultMapping(Addressable.class, MemoryAddress.NULL);
         addDefaultMapping(MemoryLayout.class, MemoryLayouts.JAVA_INT);
+        addDefaultMapping(MemoryLayout.Path.class, MemoryLayouts.JAVA_INT.path());
         addDefaultMapping(ValueLayout.class, MemoryLayouts.JAVA_INT);
         addDefaultMapping(GroupLayout.class, MemoryLayout.ofStruct(MemoryLayouts.JAVA_INT));
         addDefaultMapping(SequenceLayout.class, MemoryLayout.ofSequence(MemoryLayouts.JAVA_INT));

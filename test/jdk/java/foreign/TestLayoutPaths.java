@@ -30,7 +30,6 @@
 import jdk.incubator.foreign.GroupLayout;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemoryLayout;
-import jdk.incubator.foreign.MemoryLayout.PathElement;
 import jdk.incubator.foreign.SequenceLayout;
 
 import org.testng.annotations.*;
@@ -39,8 +38,6 @@ import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.List;
 
-import static jdk.incubator.foreign.MemoryLayout.PathElement.groupElement;
-import static jdk.incubator.foreign.MemoryLayout.PathElement.sequenceElement;
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 import static org.testng.Assert.*;
 
@@ -49,161 +46,161 @@ public class TestLayoutPaths {
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadBitSelectFromSeq() {
         SequenceLayout seq = MemoryLayout.ofSequence(JAVA_INT);
-        seq.bitOffset(groupElement("foo"));
+        seq.path().groupElement("foo").bitOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadByteSelectFromSeq() {
         SequenceLayout seq = MemoryLayout.ofSequence(JAVA_INT);
-        seq.byteOffset(groupElement("foo"));
+        seq.path().groupElement("foo").byteOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadBitSelectFromStruct() {
         GroupLayout g = MemoryLayout.ofStruct(JAVA_INT);
-        g.bitOffset(sequenceElement());
+        g.path().sequenceElement().bitOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadByteSelectFromStruct() {
         GroupLayout g = MemoryLayout.ofStruct(JAVA_INT);
-        g.byteOffset(sequenceElement());
+        g.path().sequenceElement().byteOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadBitSelectFromValue() {
         SequenceLayout seq = MemoryLayout.ofSequence(JAVA_INT);
-        seq.bitOffset(sequenceElement(), sequenceElement());
+        seq.path().sequenceElement().sequenceElement().bitOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadByteSelectFromValue() {
         SequenceLayout seq = MemoryLayout.ofSequence(JAVA_INT);
-        seq.byteOffset(sequenceElement(), sequenceElement());
+        seq.path().sequenceElement().sequenceElement().byteOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testUnknownBitStructField() {
         GroupLayout g = MemoryLayout.ofStruct(JAVA_INT);
-        g.bitOffset(groupElement("foo"));
+        g.path().groupElement("foo").bitOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testUnknownByteStructField() {
         GroupLayout g = MemoryLayout.ofStruct(JAVA_INT);
-        g.byteOffset(groupElement("foo"));
+        g.path().groupElement("foo").byteOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBitOutOfBoundsSeqIndex() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, JAVA_INT);
-        seq.bitOffset(sequenceElement(6));
+        seq.path().sequenceElement(6).bitOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testByteOutOfBoundsSeqIndex() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, JAVA_INT);
-        seq.byteOffset(sequenceElement(6));
+        seq.path().sequenceElement(6).byteOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testNegativeSeqIndex() {
-       sequenceElement(-2);
+       JAVA_INT.path().sequenceElement(-2);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBitNegativeSeqIndex() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, JAVA_INT);
-        seq.bitOffset(sequenceElement(-2));
+        seq.path().sequenceElement(-2).bitOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testByteNegativeSeqIndex() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, JAVA_INT);
-        seq.byteOffset(sequenceElement(-2));
+        seq.path().sequenceElement(-2).byteOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testOutOfBoundsSeqRange() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, JAVA_INT);
-        seq.bitOffset(sequenceElement(6, 2));
+        seq.path().sequenceElement(6, 2).bitOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testNegativeSeqRange() {
-        sequenceElement(-2, 2);
+        JAVA_INT.path().sequenceElement(-2, 2);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBitNegativeSeqRange() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, JAVA_INT);
-        seq.bitOffset(sequenceElement(-2, 2));
+        seq.path().sequenceElement(-2, 2).bitOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testByteNegativeSeqRange() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, JAVA_INT);
-        seq.byteOffset(sequenceElement(-2, 2));
+        seq.path().sequenceElement(-2, 2).byteOffset();
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testIncompleteAccess() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, MemoryLayout.ofStruct(JAVA_INT));
-        seq.varHandle(int.class, sequenceElement());
+        seq.path().sequenceElement().varHandle(int.class);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBitOffsetHandleBadRange() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, MemoryLayout.ofStruct(JAVA_INT));
-        seq.bitOffsetHandle(sequenceElement(0, 1)); // ranges not accepted
+        seq.path().sequenceElement(0, 1).bitOffsetHandle(); // ranges not accepted
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testByteOffsetHandleBadRange() {
         SequenceLayout seq = MemoryLayout.ofSequence(5, MemoryLayout.ofStruct(JAVA_INT));
-        seq.byteOffsetHandle(sequenceElement(0, 1)); // ranges not accepted
+        seq.path().sequenceElement(0, 1).byteOffsetHandle(); // ranges not accepted
     }
 
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testBadMultiple() {
         GroupLayout g = MemoryLayout.ofStruct(MemoryLayout.ofPaddingBits(3), JAVA_INT.withName("foo"));
-        g.byteOffset(groupElement("foo"));
+        g.path().groupElement("foo").byteOffset();
     }
 
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testBitOffsetBadUnboundedSequenceTraverse() {
         MemoryLayout layout = MemoryLayout.ofSequence(MemoryLayout.ofSequence(JAVA_INT));
-        layout.bitOffset(sequenceElement(1), sequenceElement(0));
+        layout.path().sequenceElement(1).sequenceElement(0).bitOffset();
     }
 
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testByteOffsetBadUnboundedSequenceTraverse() {
         MemoryLayout layout = MemoryLayout.ofSequence(MemoryLayout.ofSequence(JAVA_INT));
-        layout.byteOffset(sequenceElement(1), sequenceElement(0));
+        layout.path().sequenceElement(1).sequenceElement(0).byteOffset();
     }
 
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testBitOffsetHandleBadUnboundedSequenceTraverse() {
         MemoryLayout layout = MemoryLayout.ofSequence(MemoryLayout.ofSequence(JAVA_INT));
-        layout.bitOffsetHandle(sequenceElement(1), sequenceElement(0));
+        layout.path().sequenceElement(1).sequenceElement(0).bitOffsetHandle();
     }
 
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testByteOffsetHandleBadUnboundedSequenceTraverse() {
         MemoryLayout layout = MemoryLayout.ofSequence(MemoryLayout.ofSequence(JAVA_INT));
-        layout.byteOffsetHandle(sequenceElement(1), sequenceElement(0));
+        layout.path().sequenceElement(1).sequenceElement(0).byteOffsetHandle();
     }
 
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testBadByteOffsetNoMultipleOf8() {
         MemoryLayout layout = MemoryLayout.ofStruct(MemoryLayout.ofPaddingBits(7), JAVA_INT.withName("x"));
-        layout.byteOffset(groupElement("x"));
+        layout.path().groupElement("x").byteOffset();
     }
 
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testBadByteOffsetHandleNoMultipleOf8() throws Throwable {
         MemoryLayout layout = MemoryLayout.ofStruct(MemoryLayout.ofPaddingBits(7), JAVA_INT.withName("x"));
-        MethodHandle handle = layout.byteOffsetHandle(groupElement("x"));
+        MethodHandle handle = layout.path().groupElement("x").byteOffsetHandle();
         handle.invoke();
     }
 
@@ -211,13 +208,13 @@ public class TestLayoutPaths {
     public void testBadContainerAlign() {
         GroupLayout g = MemoryLayout.ofStruct(JAVA_INT.withBitAlignment(16).withName("foo")).withBitAlignment(8);
         try {
-            g.bitOffset(groupElement("foo"));
-            g.byteOffset(groupElement("foo"));
+            g.path().groupElement("foo").bitOffset();
+            g.path().groupElement("foo").byteOffset();
         } catch (Throwable ex) {
             throw new AssertionError(ex); // should be ok!
         }
         try {
-            g.varHandle(int.class, groupElement("foo")); //ok
+            g.path().groupElement("foo").varHandle(int.class); //ok
             assertTrue(false); //should fail!
         } catch (UnsupportedOperationException ex) {
             //ok
@@ -230,13 +227,13 @@ public class TestLayoutPaths {
     public void testBadAlignOffset() {
         GroupLayout g = MemoryLayout.ofStruct(MemoryLayouts.PAD_8, JAVA_INT.withBitAlignment(16).withName("foo"));
         try {
-            g.bitOffset(groupElement("foo"));
-            g.byteOffset(groupElement("foo"));
+            g.path().groupElement("foo").bitOffset();
+            g.path().groupElement("foo").byteOffset();
         } catch (Throwable ex) {
             throw new AssertionError(ex); // should be ok!
         }
         try {
-            g.varHandle(int.class, groupElement("foo")); //ok
+            g.path().groupElement("foo").varHandle(int.class); //ok
             assertTrue(false); //should fail!
         } catch (UnsupportedOperationException ex) {
             //ok
@@ -249,15 +246,15 @@ public class TestLayoutPaths {
     public void testBadSequencePathInOffset() {
         SequenceLayout seq = MemoryLayout.ofSequence(10, JAVA_INT);
         // bad path elements
-        for (PathElement e : List.of( sequenceElement(), sequenceElement(0, 2) )) {
+        for (MemoryLayout.Path p : List.of( seq.path().sequenceElement(), seq.path().sequenceElement(0, 2) )) {
             try {
-                seq.bitOffset(e);
+                p.bitOffset();
                 fail();
             } catch (IllegalArgumentException ex) {
                 assertTrue(true);
             }
             try {
-                seq.byteOffset(e);
+                p.byteOffset();
                 fail();
             } catch (IllegalArgumentException ex) {
                 assertTrue(true);
@@ -268,9 +265,9 @@ public class TestLayoutPaths {
     @Test
     public void testBadSequencePathInSelect() {
         SequenceLayout seq = MemoryLayout.ofSequence(10, JAVA_INT);
-        for (PathElement e : List.of( sequenceElement(0), sequenceElement(0, 2) )) {
+        for (MemoryLayout.Path p : List.of( seq.path().sequenceElement(0), seq.path().sequenceElement(0, 2) )) {
             try {
-                seq.select(e);
+                p.layout();
                 fail();
             } catch (IllegalArgumentException ex) {
                 assertTrue(true);
@@ -281,9 +278,9 @@ public class TestLayoutPaths {
     @Test
     public void testBadSequencePathInMap() {
         SequenceLayout seq = MemoryLayout.ofSequence(10, JAVA_INT);
-        for (PathElement e : List.of( sequenceElement(0), sequenceElement(0, 2) )) {
+        for (MemoryLayout.Path p : List.of( seq.path().sequenceElement(0), seq.path().sequenceElement(0, 2) )) {
             try {
-                seq.map(l -> l, e);
+                p.map(l -> l);
                 fail();
             } catch (IllegalArgumentException ex) {
                 assertTrue(true);
@@ -304,23 +301,23 @@ public class TestLayoutPaths {
         // test select
 
         for (int i = 1 ; i <= 4 ; i++) {
-            MemoryLayout selected = g.select(groupElement(String.valueOf(i)));
+            MemoryLayout selected = g.path().groupElement(String.valueOf(i)).layout();
             assertTrue(selected == g.memberLayouts().get(i - 1));
         }
 
         // test offset
 
         for (int i = 1 ; i <= 4 ; i++) {
-            long bitOffset = g.bitOffset(groupElement(String.valueOf(i)));
+            long bitOffset = g.path().groupElement(String.valueOf(i)).bitOffset();
             assertEquals(offsets[i - 1], bitOffset);
-            long byteOffset = g.byteOffset(groupElement(String.valueOf(i)));
+            long byteOffset = g.path().groupElement(String.valueOf(i)).byteOffset();
             assertEquals((offsets[i - 1]) >>> 3, byteOffset);
         }
 
         // test map
 
         for (int i = 1 ; i <= 4 ; i++) {
-            GroupLayout g2 = (GroupLayout)g.map(l -> MemoryLayouts.JAVA_DOUBLE, groupElement(String.valueOf(i)));
+            GroupLayout g2 = (GroupLayout)g.path().groupElement(String.valueOf(i)).map(l -> MemoryLayouts.JAVA_DOUBLE);
             assertTrue(g2.isStruct());
             for (int j = 0 ; j < 4 ; j++) {
                 if (j == i - 1) {
@@ -345,23 +342,23 @@ public class TestLayoutPaths {
         // test select
 
         for (int i = 1 ; i <= 4 ; i++) {
-            MemoryLayout selected = g.select(groupElement(String.valueOf(i)));
+            MemoryLayout selected = g.path().groupElement(String.valueOf(i)).layout();
             assertTrue(selected == g.memberLayouts().get(i - 1));
         }
 
         // test offset
 
         for (int i = 1 ; i <= 4 ; i++) {
-            long bitOffset = g.bitOffset(groupElement(String.valueOf(i)));
+            long bitOffset = g.path().groupElement(String.valueOf(i)).bitOffset();
             assertEquals(offsets[i - 1], bitOffset);
-            long byteOffset = g.byteOffset(groupElement(String.valueOf(i)));
+            long byteOffset = g.path().groupElement(String.valueOf(i)).byteOffset();
             assertEquals((offsets[i - 1]) >>> 3, byteOffset);
         }
 
         // test map
 
         for (int i = 1 ; i <= 4 ; i++) {
-            GroupLayout g2 = (GroupLayout)g.map(l -> MemoryLayouts.JAVA_DOUBLE, groupElement(String.valueOf(i)));
+            GroupLayout g2 = (GroupLayout)g.path().groupElement(String.valueOf(i)).map(l -> MemoryLayouts.JAVA_DOUBLE);
             assertTrue(g2.isUnion());
             for (int j = 0 ; j < 4 ; j++) {
                 if (j == i - 1) {
@@ -380,33 +377,33 @@ public class TestLayoutPaths {
 
         // test select
 
-        MemoryLayout selected = g.select(sequenceElement());
+        MemoryLayout selected = g.path().sequenceElement().layout();
         assertTrue(selected == MemoryLayouts.JAVA_BYTE);
 
         // test offset
 
         for (int i = 0 ; i < 4 ; i++) {
-            long bitOffset = g.bitOffset(sequenceElement(i));
+            long bitOffset = g.path().sequenceElement(i).bitOffset();
             assertEquals(offsets[i], bitOffset);
-            long byteOffset = g.byteOffset(sequenceElement(i));
+            long byteOffset = g.path().sequenceElement(i).byteOffset();
             assertEquals((offsets[i]) >>> 3, byteOffset);
         }
 
         // test map
 
-        SequenceLayout seq2 = (SequenceLayout)g.map(l -> MemoryLayouts.JAVA_DOUBLE, sequenceElement());
+        SequenceLayout seq2 = (SequenceLayout)g.path().sequenceElement().map(l -> MemoryLayouts.JAVA_DOUBLE);
         assertTrue(seq2.elementLayout() == MemoryLayouts.JAVA_DOUBLE);
     }
 
     @Test(dataProvider =  "offsetHandleCases")
-    public void testOffsetHandle(MemoryLayout layout, PathElement[] pathElements, long[] indexes,
+    public void testOffsetHandle(MemoryLayout.Path path, long[] indexes,
                                  long expectedBitOffset) throws Throwable {
-        MethodHandle bitOffsetHandle = layout.bitOffsetHandle(pathElements);
+        MethodHandle bitOffsetHandle = path.bitOffsetHandle();
         bitOffsetHandle = bitOffsetHandle.asSpreader(long[].class, indexes.length);
         long actualBitOffset = (long) bitOffsetHandle.invokeExact(indexes);
         assertEquals(actualBitOffset, expectedBitOffset);
         if (expectedBitOffset % 8 == 0) {
-            MethodHandle byteOffsetHandle = layout.byteOffsetHandle(pathElements);
+            MethodHandle byteOffsetHandle = path.byteOffsetHandle();
             byteOffsetHandle = byteOffsetHandle.asSpreader(long[].class, indexes.length);
             long actualByteOffset = (long) byteOffsetHandle.invokeExact(indexes);
             assertEquals(actualByteOffset, expectedBitOffset / 8);
@@ -418,34 +415,34 @@ public class TestLayoutPaths {
         List<Object[]> testCases = new ArrayList<>();
 
         testCases.add(new Object[] {
-            MemoryLayout.ofSequence(10, JAVA_INT),
-            new PathElement[] { sequenceElement() },
+            MemoryLayout.ofSequence(10, JAVA_INT).path().sequenceElement(),
             new long[] { 4 },
             JAVA_INT.bitSize() * 4
         });
+        MemoryLayout seq1 = MemoryLayout.ofSequence(10, MemoryLayout.ofStruct(JAVA_INT, JAVA_INT.withName("y")));
         testCases.add(new Object[] {
-            MemoryLayout.ofSequence(10, MemoryLayout.ofStruct(JAVA_INT, JAVA_INT.withName("y"))),
-            new PathElement[] { sequenceElement(), groupElement("y") },
+            seq1.path().sequenceElement().groupElement("y"),
             new long[] { 4 },
             (JAVA_INT.bitSize() * 2) * 4 + JAVA_INT.bitSize()
         });
+        MemoryLayout seq2 = MemoryLayout.ofSequence(10, MemoryLayout.ofStruct(MemoryLayout.ofPaddingBits(5), JAVA_INT.withName("y")));
         testCases.add(new Object[] {
-            MemoryLayout.ofSequence(10, MemoryLayout.ofStruct(MemoryLayout.ofPaddingBits(5), JAVA_INT.withName("y"))),
-            new PathElement[] { sequenceElement(), groupElement("y") },
+            seq2.path().sequenceElement().groupElement("y"),
             new long[] { 4 },
             (JAVA_INT.bitSize() + 5) * 4 + 5
         });
         testCases.add(new Object[] {
-            MemoryLayout.ofSequence(10, JAVA_INT),
-            new PathElement[] { sequenceElement() },
+            MemoryLayout.ofSequence(10, JAVA_INT).path().sequenceElement(),
             new long[] { 4 },
             JAVA_INT.bitSize() * 4
         });
-        testCases.add(new Object[] {
-            MemoryLayout.ofStruct(
+
+        MemoryLayout struct = MemoryLayout.ofStruct(
                 MemoryLayout.ofSequence(10, JAVA_INT).withName("data")
-            ),
-            new PathElement[] { groupElement("data"), sequenceElement() },
+        );
+
+        testCases.add(new Object[] {
+            struct.path().groupElement("data").sequenceElement(),
             new long[] { 4 },
             JAVA_INT.bitSize() * 4
         });
@@ -462,26 +459,22 @@ public class TestLayoutPaths {
         );
 
         testCases.add(new Object[] {
-            complexLayout,
-            new PathElement[] { groupElement("data"), sequenceElement(), sequenceElement(), groupElement("x") },
+            complexLayout.path().groupElement("data").sequenceElement().sequenceElement().groupElement("x"),
             new long[] { 0, 1 },
             (JAVA_INT.bitSize() * 2)
         });
         testCases.add(new Object[] {
-            complexLayout,
-            new PathElement[] { groupElement("data"), sequenceElement(), sequenceElement(), groupElement("x") },
+            complexLayout.path().groupElement("data").sequenceElement().sequenceElement().groupElement("x"),
             new long[] { 1, 0 },
             (JAVA_INT.bitSize() * 2) * 10
         });
         testCases.add(new Object[] {
-            complexLayout,
-            new PathElement[] { groupElement("data"), sequenceElement(), sequenceElement(), groupElement("y") },
+            complexLayout.path().groupElement("data").sequenceElement().sequenceElement().groupElement("y"),
             new long[] { 0, 1 },
             (JAVA_INT.bitSize() * 2) + JAVA_INT.bitSize()
         });
         testCases.add(new Object[] {
-            complexLayout,
-            new PathElement[] { groupElement("data"), sequenceElement(), sequenceElement(), groupElement("y") },
+            complexLayout.path().groupElement("data").sequenceElement().sequenceElement().groupElement("y"),
             new long[] { 1, 0 },
             (JAVA_INT.bitSize() * 2) * 10 + JAVA_INT.bitSize()
         });

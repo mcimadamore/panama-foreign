@@ -41,8 +41,7 @@ public class TestSlices {
     static MemoryLayout LAYOUT = MemoryLayout.ofSequence(2,
             MemoryLayout.ofSequence(5, MemoryLayouts.JAVA_INT));
 
-    static VarHandle VH_ALL = LAYOUT.varHandle(int.class,
-            MemoryLayout.PathElement.sequenceElement(), MemoryLayout.PathElement.sequenceElement());
+    static VarHandle VH_ALL = LAYOUT.path().sequenceElement().sequenceElement().varHandle(int.class);
 
     @Test(dataProvider = "slices")
     public void testSlices(VarHandle handle, int lo, int hi, int[] values) {
@@ -75,17 +74,13 @@ public class TestSlices {
                 // x
                 { VH_ALL, 2, 5, new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } },
                 // x[0::2]
-                { LAYOUT.varHandle(int.class, MemoryLayout.PathElement.sequenceElement(),
-                        MemoryLayout.PathElement.sequenceElement(0, 2)), 2, 3, new int[] { 1, 3, 5, 6, 8, 10 } },
+                { LAYOUT.path().sequenceElement().sequenceElement(0, 2).varHandle(int.class), 2, 3, new int[] { 1, 3, 5, 6, 8, 10 } },
                 // x[1::2]
-                { LAYOUT.varHandle(int.class, MemoryLayout.PathElement.sequenceElement(),
-                        MemoryLayout.PathElement.sequenceElement(1, 2)), 2, 2, new int[] { 2, 4, 7, 9 } },
+                { LAYOUT.path().sequenceElement().sequenceElement(1, 2).varHandle(int.class), 2, 2, new int[] { 2, 4, 7, 9 } },
                 // x[4::-2]
-                { LAYOUT.varHandle(int.class, MemoryLayout.PathElement.sequenceElement(),
-                        MemoryLayout.PathElement.sequenceElement(4, -2)), 2, 3, new int[] { 5, 3, 1, 10, 8, 6 } },
+                { LAYOUT.path().sequenceElement().sequenceElement(4, -2).varHandle(int.class), 2, 3, new int[] { 5, 3, 1, 10, 8, 6 } },
                 // x[3::-2]
-                { LAYOUT.varHandle(int.class, MemoryLayout.PathElement.sequenceElement(),
-                        MemoryLayout.PathElement.sequenceElement(3, -2)), 2, 2, new int[] { 4, 2, 9, 7 } },
+                { LAYOUT.path().sequenceElement().sequenceElement(3, -2).varHandle(int.class), 2, 2, new int[] { 4, 2, 9, 7 } },
         };
     }
 }

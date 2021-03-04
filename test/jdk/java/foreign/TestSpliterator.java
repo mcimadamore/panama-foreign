@@ -51,7 +51,7 @@ import static org.testng.Assert.*;
 public class TestSpliterator {
 
     static final VarHandle INT_HANDLE = MemoryLayout.ofSequence(MemoryLayouts.JAVA_INT)
-            .varHandle(int.class, MemoryLayout.PathElement.sequenceElement());
+            .path().sequenceElement().varHandle(int.class);
 
     final static int CARRIER_SIZE = 4;
 

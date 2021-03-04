@@ -43,7 +43,7 @@ import static org.testng.Assert.assertThrows;
 
 public class TestMismatch {
 
-    final static VarHandle BYTE_HANDLE = MemoryLayouts.JAVA_BYTE.varHandle(byte.class);
+    final static VarHandle BYTE_HANDLE = MemoryLayouts.JAVA_BYTE.path().varHandle(byte.class);
 
     // stores a increasing sequence of values into the memory of the given segment
     static MemorySegment initializeSegment(MemorySegment segment) {

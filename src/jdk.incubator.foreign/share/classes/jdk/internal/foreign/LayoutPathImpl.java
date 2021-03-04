@@ -46,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.LongSupplier;
 import java.util.function.ToLongFunction;
 import java.util.function.UnaryOperator;
 
@@ -78,23 +79,54 @@ public class LayoutPathImpl implements MemoryLayout.Path {
         }
     }
 
+    static abstract class LazyLong {
+        abstract long getValue();
+
+        static LazyLong ofConstant(long value) {
+            return new LazyLong() {
+                @Override
+                long getValue() {
+                    return value;
+                }
+            };
+        }
+
+        static LazyLong of(LongSupplier longSupplier) {
+            return new LazyLong() {
+                @Override
+                long getValue() {
+                    return longSupplier.getAsLong();
+                }
+            };
+        }
+    }
+
+    enum PathKind {
+        ROOT,
+        SEQUENCE_SINGLE,
+        SEQUENCE_UNSPECIFIED,
+        SEQUENCE_MULTI,
+        GROUP_NAME
+    }
+
     private final MemoryLayout layout;
-    private final long offset;
+    private final LazyLong offset;
     private final LayoutPathImpl enclosing;
-    @Stable
-    private final long[] strides;
+    private final LazyLong[] strides;
     private final long elementIndex;
+    private final PathKind kind;
     @Stable
     VarHandle handle;
     @Stable
     MethodHandle offsetHandle;
 
-    private LayoutPathImpl(MemoryLayout layout, long offset, long[] strides, long elementIndex, LayoutPathImpl enclosing) {
+    private LayoutPathImpl(PathKind kind, MemoryLayout layout, LazyLong offset, LazyLong[] strides, long elementIndex, LayoutPathImpl enclosing) {
         this.layout = layout;
         this.offset = offset;
         this.strides = strides;
         this.enclosing = enclosing;
         this.elementIndex = elementIndex;
+        this.kind = kind;
     }
 
     // Layout path selector methods
@@ -104,7 +136,7 @@ public class LayoutPathImpl implements MemoryLayout.Path {
         check(SequenceLayout.class, "attempting to select a sequence element from a non-sequence layout");
         SequenceLayout seq = (SequenceLayout)layout;
         MemoryLayout elem = seq.elementLayout();
-        return new LayoutPathImpl(elem, offset, addStride(elem.bitSize()), UNSPECIFIED_ELEM_INDEX, this);
+        return new LayoutPathImpl(PathKind.SEQUENCE_UNSPECIFIED, elem, offset, addStride(LazyLong.of(() -> elem.bitSize())), UNSPECIFIED_ELEM_INDEX, this);
     }
 
     @Override
@@ -120,7 +152,7 @@ public class LayoutPathImpl implements MemoryLayout.Path {
         checkSequenceBounds(seq, start);
         MemoryLayout elem = seq.elementLayout();
         long elemSize = elem.bitSize();
-        return new LayoutPathImpl(elem, offset + (start * elemSize), addStride(elemSize * step),
+        return new LayoutPathImpl(PathKind.SEQUENCE_MULTI, elem, LazyLong.of(() -> offset.getValue() + (start * elemSize)), addStride(LazyLong.of(() -> elem.bitSize() * step)),
                 UNSPECIFIED_ELEM_INDEX, this);
     }
 
@@ -138,7 +170,8 @@ public class LayoutPathImpl implements MemoryLayout.Path {
             long elemSize = seq.elementLayout().bitSize();
             elemOffset = elemSize * index;
         }
-        return new LayoutPathImpl(seq.elementLayout(), offset + elemOffset, strides, index, this);
+        long offsetFinal = elemOffset;
+        return new LayoutPathImpl(PathKind.SEQUENCE_SINGLE, seq.elementLayout(), LazyLong.of(() -> offset.getValue() + offsetFinal), strides, index, this);
     }
 
     @Override
@@ -163,16 +196,19 @@ public class LayoutPathImpl implements MemoryLayout.Path {
         if (elem == null) {
             throw badLayoutPath("cannot resolve '" + name + "' in layout " + layout);
         }
-        return new LayoutPathImpl(elem, this.offset + offset, strides, index, this);
+        long finalOffset = offset;
+        return new LayoutPathImpl(PathKind.GROUP_NAME, elem, LazyLong.of(() -> this.offset.getValue() + finalOffset), strides, index, this);
     }
 
     // Layout path projections
 
     public long bitOffset() {
-        return offset;
+        checkNoKind(PathKind.SEQUENCE_MULTI, PathKind.SEQUENCE_UNSPECIFIED);
+        return offset.getValue();
     }
 
     public VarHandle varHandle(Class<?> carrier) {
+        Objects.requireNonNull(carrier);
         if (handle == null) {
             handle = dereferenceHandle(carrier);
         }
@@ -197,10 +233,10 @@ public class LayoutPathImpl implements MemoryLayout.Path {
             perms.addLast(i + 1);
             //add stride
             handle = MemoryHandles.collectCoordinates(handle, 1 + i,
-                    MethodHandles.insertArguments(ADD_STRIDE, 1, Utils.bitsToBytesOrThrow(strides[strides.length - 1 - i], IllegalStateException::new))); // MS, long, MS_n, long_n, long
+                    MethodHandles.insertArguments(ADD_STRIDE, 1, Utils.bitsToBytesOrThrow(strides[strides.length - 1 - i].getValue(), IllegalStateException::new))); // MS, long, MS_n, long_n, long
         }
         //add offset
-        handle = MemoryHandles.insertCoordinates(handle, 1 + strides.length, Utils.bitsToBytesOrThrow(offset, IllegalStateException::new));
+        handle = MemoryHandles.insertCoordinates(handle, 1 + strides.length, Utils.bitsToBytesOrThrow(offset.getValue(), IllegalStateException::new));
 
         if (strides.length > 0) {
             // remove duplicate MS args
@@ -222,23 +258,26 @@ public class LayoutPathImpl implements MemoryLayout.Path {
     }
 
     private MethodHandle offsetHandle() {
+        checkNoKind(PathKind.SEQUENCE_MULTI);
         MethodHandle mh = MethodHandles.identity(long.class);
         for (int i = strides.length - 1; i >=0; i--) {
-            MethodHandle collector = MethodHandles.insertArguments(MH_ADD_SCALED_OFFSET, 2, strides[i]);
+            MethodHandle collector = MethodHandles.insertArguments(MH_ADD_SCALED_OFFSET, 2, strides[i].getValue());
             // (J, ...) -> J to (J, J, ...) -> J
             // i.e. new coord is prefixed. Last coord will correspond to innermost layout
             mh = MethodHandles.collectArguments(mh, 0, collector);
         }
-        mh = MethodHandles.insertArguments(mh, 0, offset);
+        mh = MethodHandles.insertArguments(mh, 0, offset.getValue());
         return mh;
     }
 
     public MemoryLayout layout() {
+        checkNoKind(PathKind.SEQUENCE_MULTI, PathKind.SEQUENCE_SINGLE);
         return layout;
     }
 
     public MemoryLayout map(UnaryOperator<MemoryLayout> op) {
         Objects.requireNonNull(op);
+        checkNoKind(PathKind.SEQUENCE_MULTI, PathKind.SEQUENCE_SINGLE);
         MemoryLayout newLayout = op.apply(layout);
         if (enclosing == null) {
             return newLayout;
@@ -275,7 +314,7 @@ public class LayoutPathImpl implements MemoryLayout.Path {
     // Layout path construction
 
     public static LayoutPathImpl rootPath(MemoryLayout layout) {
-        return new LayoutPathImpl(layout, 0L, EMPTY_STRIDES, -1, null);
+        return new LayoutPathImpl(PathKind.ROOT, layout, LazyLong.ofConstant(0L), EMPTY_STRIDES, -1, null);
     }
 
     // Helper methods
@@ -299,11 +338,11 @@ public class LayoutPathImpl implements MemoryLayout.Path {
     private static void checkAlignment(LayoutPathImpl path) {
         MemoryLayout layout = path.layout;
         long alignment = layout.bitAlignment();
-        if (path.offset % alignment != 0) {
+        if (path.offset.getValue() % alignment != 0) {
             throw new UnsupportedOperationException("Invalid alignment requirements for layout " + layout);
         }
-        for (long stride : path.strides) {
-            if (stride % alignment != 0) {
+        for (LazyLong stride : path.strides) {
+            if (stride.getValue() % alignment != 0) {
                 throw new UnsupportedOperationException("Alignment requirements for layout " + layout + " do not match stride " + stride);
             }
         }
@@ -316,14 +355,14 @@ public class LayoutPathImpl implements MemoryLayout.Path {
         }
     }
 
-    private long[] addStride(long stride) {
-        long[] newStrides = new long[strides.length + 1];
+    private LazyLong[] addStride(LazyLong stride) {
+        LazyLong[] newStrides = new LazyLong[strides.length + 1];
         System.arraycopy(strides, 0, newStrides, 0, strides.length);
         newStrides[strides.length] = stride;
         return newStrides;
     }
 
-    private static final long[] EMPTY_STRIDES = new long[0];
+    private static final LazyLong[] EMPTY_STRIDES = new LazyLong[0];
 
     @Override
     public int freeDimensions() {
@@ -333,5 +372,17 @@ public class LayoutPathImpl implements MemoryLayout.Path {
     private static long addStride(MemorySegment segment, long stride, long base, long index) {
         return MemorySegmentProxy.addOffsets(base,
                     MemorySegmentProxy.multiplyOffsets(stride, index, ((MemorySegmentProxy)segment)), (MemorySegmentProxy)segment);
+    }
+
+    private void checkNoKind(PathKind... badKinds) {
+        LayoutPathImpl curr = this;
+        while (curr != null) {
+            for (PathKind p : badKinds) {
+                if (curr.kind == p) {
+                    throw new IllegalArgumentException("Bad layout path");
+                }
+            }
+            curr = curr.enclosing;
+        }
     }
 }

@@ -87,17 +87,17 @@ public class TestAdaptVarHandles {
     }
 
     static final VarHandle intHandleIndexed = MemoryLayout.ofSequence(MemoryLayouts.JAVA_INT)
-            .varHandle(int.class, MemoryLayout.PathElement.sequenceElement());
+            .path().sequenceElement().varHandle(int.class);
 
-    static final VarHandle intHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+    static final VarHandle intHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
 
-    static final VarHandle floatHandle = MemoryLayouts.JAVA_FLOAT.varHandle(float.class);
+    static final VarHandle floatHandle = MemoryLayouts.JAVA_FLOAT.path().varHandle(float.class);
 
     @Test
     public void testFilterValue() throws Throwable {
         ValueLayout layout = MemoryLayouts.JAVA_INT;
         MemorySegment segment = MemorySegment.allocateNative(layout);
-        VarHandle intHandle = layout.varHandle(int.class);
+        VarHandle intHandle = layout.path().varHandle(int.class);
         VarHandle i2SHandle = MemoryHandles.filterValue(intHandle, S2I, I2S);
         i2SHandle.set(segment, "1");
         String oldValue = (String)i2SHandle.getAndAdd(segment, "42");
@@ -116,7 +116,7 @@ public class TestAdaptVarHandles {
     public void testFilterValueComposite() throws Throwable {
         ValueLayout layout = MemoryLayouts.JAVA_INT;
         MemorySegment segment = MemorySegment.allocateNative(layout);
-        VarHandle intHandle = layout.varHandle(int.class);
+        VarHandle intHandle = layout.path().varHandle(int.class);
         MethodHandle CTX_S2I = MethodHandles.dropArguments(S2I, 0, String.class, String.class);
         VarHandle i2SHandle = MemoryHandles.filterValue(intHandle, CTX_S2I, CTX_I2S);
         i2SHandle = MemoryHandles.insertCoordinates(i2SHandle, 1, "a", "b");
@@ -137,7 +137,7 @@ public class TestAdaptVarHandles {
     public void testFilterValueLoose() throws Throwable {
         ValueLayout layout = MemoryLayouts.JAVA_INT;
         MemorySegment segment = MemorySegment.allocateNative(layout);
-        VarHandle intHandle = layout.varHandle(int.class);
+        VarHandle intHandle = layout.path().varHandle(int.class);
         VarHandle i2SHandle = MemoryHandles.filterValue(intHandle, O2I, I2O);
         i2SHandle.set(segment, "1");
         String oldValue = (String)i2SHandle.getAndAdd(segment, "42");
@@ -159,19 +159,19 @@ public class TestAdaptVarHandles {
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadFilterUnboxArity() {
-        VarHandle floatHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+        VarHandle floatHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
         MemoryHandles.filterValue(floatHandle, S2I.bindTo(""), I2S);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadFilterBoxArity() {
-        VarHandle intHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+        VarHandle intHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
         MemoryHandles.filterValue(intHandle, S2I, I2S.bindTo(42));
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadFilterBoxPrefixCoordinates() {
-        VarHandle intHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+        VarHandle intHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
         MemoryHandles.filterValue(intHandle,
                 MethodHandles.dropArguments(S2I, 1, int.class),
                 MethodHandles.dropArguments(I2S, 1, long.class));
@@ -179,25 +179,25 @@ public class TestAdaptVarHandles {
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadFilterBoxException() {
-        VarHandle intHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+        VarHandle intHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
         MemoryHandles.filterValue(intHandle, I2S, S2L_EX);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadFilterUnboxException() {
-        VarHandle intHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+        VarHandle intHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
         MemoryHandles.filterValue(intHandle, S2L_EX, I2S);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadFilterBoxHandleException() {
-        VarHandle intHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+        VarHandle intHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
         MemoryHandles.filterValue(intHandle, S2I, I2S_EX);
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void testBadFilterUnboxHandleException() {
-        VarHandle intHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+        VarHandle intHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
         MemoryHandles.filterValue(intHandle, S2I_EX, I2S);
     }
 

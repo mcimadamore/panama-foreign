@@ -45,7 +45,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static jdk.incubator.foreign.CLinker.*;
-import static jdk.incubator.foreign.MemoryLayout.PathElement.*;
 import static org.testng.Assert.assertEquals;
 
 public class TestVarArgs {
@@ -54,10 +53,10 @@ public class TestVarArgs {
             C_POINTER.withName("writeback"), // writeback
             C_POINTER.withName("argIDs")); // arg ids
 
-    static final VarHandle VH_CallInfo_writeback = ML_CallInfo.varHandle(long.class, groupElement("writeback"));
-    static final VarHandle VH_CallInfo_argIDs = ML_CallInfo.varHandle(long.class, groupElement("argIDs"));
+    static final VarHandle VH_CallInfo_writeback = ML_CallInfo.path().groupElement("writeback").varHandle(long.class);
+    static final VarHandle VH_CallInfo_argIDs = ML_CallInfo.path().groupElement("argIDs").varHandle(long.class);
 
-    static final VarHandle VH_IntArray = MemoryLayout.ofSequence(C_INT).varHandle(int.class, sequenceElement());
+    static final VarHandle VH_IntArray = MemoryLayout.ofSequence(C_INT).path().sequenceElement().varHandle(int.class);
 
     static final CLinker abi = CLinker.getInstance();
     static final LibraryLookup.Symbol varargsAddr = LibraryLookup.ofLibrary("VarArgs")
@@ -133,7 +132,7 @@ public class TestVarArgs {
             this.value = value;
             this.layout = layout;
             this.carrier = carrier;
-            this.vh = layout.varHandle(carrier);
+            this.vh = layout.path().varHandle(carrier);
         }
 
         static VarArg intArg(int value) {

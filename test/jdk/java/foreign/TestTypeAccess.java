@@ -39,7 +39,7 @@ import java.nio.ByteOrder;
 
 public class TestTypeAccess {
 
-    static final VarHandle INT_HANDLE = MemoryLayouts.JAVA_INT.varHandle(int.class);
+    static final VarHandle INT_HANDLE = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
 
     static final VarHandle ADDR_HANDLE = MemoryHandles.asAddressVarHandle(INT_HANDLE);
 

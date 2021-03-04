@@ -44,7 +44,7 @@ import static org.testng.Assert.*;
 
 public class TestSharedAccess {
 
-    static final VarHandle intHandle = MemoryLayouts.JAVA_INT.varHandle(int.class);
+    static final VarHandle intHandle = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
 
     @Test
     public void testConfined() throws Throwable {

@@ -41,7 +41,7 @@ import static org.testng.Assert.*;
 
 public class TestMemoryCopy {
 
-    final static VarHandle BYTE_HANDLE = MemoryLayouts.JAVA_BYTE.varHandle(byte.class);
+    final static VarHandle BYTE_HANDLE = MemoryLayouts.JAVA_BYTE.path().varHandle(byte.class);
 
     @Test(dataProvider = "slices")
     public void testCopy(SegmentSlice s1, SegmentSlice s2) {

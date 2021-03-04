@@ -1454,10 +1454,46 @@ public final class MemoryAccess {
     }
 
     @ForceInline
+    public static int getByte(MemorySegment segment, MemoryLayout.Path path) {
+        Objects.requireNonNull(segment);
+        Objects.requireNonNull(path);
+        if (path.freeDimensions() != 0) {
+            throw new UnsupportedOperationException("Bad path");
+        }
+        return (byte)path.varHandle(int.class).get(segment);
+    }
+
+    @ForceInline
+    public static byte getByteAtIndex(MemorySegment segment, MemoryLayout.Path path, long index) {
+        Objects.requireNonNull(segment);
+        Objects.requireNonNull(path);
+        if (path.freeDimensions() != 1) {
+            throw new UnsupportedOperationException("Bad path");
+        }
+        return (byte)path.varHandle(int.class).get(segment, index);
+    }
+
+    // insert other getters here
+
+    @ForceInline
+    public static int getInt(MemorySegment segment, MemoryLayout.Path path) {
+        Objects.requireNonNull(segment);
+        Objects.requireNonNull(path);
+        if (path.freeDimensions() != 0) {
+            throw new UnsupportedOperationException("Bad path");
+        }
+        return (int)path.varHandle(int.class).get(segment);
+    }
+
+    @ForceInline
     public static int getIntAtIndex(MemorySegment segment, MemoryLayout.Path path, long index) {
+        Objects.requireNonNull(segment);
+        Objects.requireNonNull(path);
         if (path.freeDimensions() != 1) {
             throw new UnsupportedOperationException("Bad path");
         }
         return (int)path.varHandle(int.class).get(segment, index);
     }
+
+    // and the setters too
 }

@@ -101,21 +101,21 @@ public class TestStructAccess {
             byteBuffer.putInt(i * VALUE_SIZE , i);
         }
 
-//        int res = 0;
-//        for (int i = 0 ; i < SEQ_SIZE ; i++) {
-//            res += MemoryAccess.getIntAtIndex(segment, KEY1_PATH, i);
-//        }
-//        System.err.println(res);
-//        res = 0;
-//        for (int i = 0 ; i < SEQ_SIZE ; i++) {
-//            res += MemoryAccess.getIntAtIndex(segment, KEY2_PATH, i);
-//        }
-//        System.err.println(res);
-//        res = 0;
-//        for (int i = 0 ; i < SEQ_SIZE ; i++) {
-//            res += MemoryAccess.getIntAtIndex(segment, VALUE_PATH, i);
-//        }
-//        System.err.println(res);
+        int res = 0;
+        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+            res += MemoryAccess.getIntAtIndex(segment, KEY1_PATH, i);
+        }
+        System.err.println(res);
+        res = 0;
+        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+            res += MemoryAccess.getIntAtIndex(segment, KEY2_PATH, i);
+        }
+        System.err.println(res);
+        res = 0;
+        for (int i = 0 ; i < SEQ_SIZE ; i++) {
+            res += MemoryAccess.getIntAtIndex(segment, VALUE_PATH, i);
+        }
+        System.err.println(res);
     }
 
     @TearDown
@@ -129,7 +129,7 @@ public class TestStructAccess {
     public int unsafe_loop() {
         int res = 0;
         for (int i = 0; i < SEQ_SIZE; i ++) {
-            res += unsafe.getInt(unsafe_addr + ((i * 2 + 1) * VALUE_SIZE));
+            res += unsafe.getInt(unsafe_addr + ((i * 3 + 2) * VALUE_SIZE));
         }
         return res;
     }
@@ -155,9 +155,8 @@ public class TestStructAccess {
     @Benchmark
     public int BB_loop() {
         int sum = 0;
-        ByteBuffer bb = byteBuffer;
         for (int i = 0; i < SEQ_SIZE; i++) {
-            sum += bb.getInt(((i * 2 + 1) * VALUE_SIZE));
+            sum += byteBuffer.getInt(((i * 3 + 2) * VALUE_SIZE));
         }
         return sum;
     }

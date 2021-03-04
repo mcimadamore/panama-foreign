@@ -55,12 +55,12 @@ public class TestLayouts {
                 MemoryLayout.ofPaddingBits(32),
                 MemoryLayout.ofSequence(MemoryLayouts.JAVA_DOUBLE).withName("arr"));
         assertFalse(layout.hasSize());
-        VarHandle size_handle = layout.varHandle(int.class, MemoryLayout.PathElement.groupElement("size"));
-        VarHandle array_elem_handle = layout.varHandle(double.class,
-                MemoryLayout.PathElement.groupElement("arr"),
-                MemoryLayout.PathElement.sequenceElement());
+        VarHandle size_handle = layout.path().groupElement("size").varHandle(int.class);
+        VarHandle array_elem_handle = layout.path()
+                .groupElement("arr")
+                .sequenceElement().varHandle(double.class);
         try (MemorySegment segment = MemorySegment.allocateNative(
-                layout.map(l -> ((SequenceLayout)l).withElementCount(4), MemoryLayout.PathElement.groupElement("arr")))) {
+                layout.path().groupElement("arr").map(l -> ((SequenceLayout)l).withElementCount(4)))) {
             size_handle.set(segment, 4);
             for (int i = 0 ; i < 4 ; i++) {
                 array_elem_handle.set(segment, i, (double)i);
@@ -80,13 +80,13 @@ public class TestLayouts {
                 MemoryLayout.ofPaddingBits(32),
                 MemoryLayout.ofSequence(1, MemoryLayout.ofSequence(MemoryLayouts.JAVA_DOUBLE)).withName("arr"));
         assertFalse(layout.hasSize());
-        VarHandle size_handle = layout.varHandle(int.class, MemoryLayout.PathElement.groupElement("size"));
-        VarHandle array_elem_handle = layout.varHandle(double.class,
-                MemoryLayout.PathElement.groupElement("arr"),
-                MemoryLayout.PathElement.sequenceElement(0),
-                MemoryLayout.PathElement.sequenceElement());
+        VarHandle size_handle = layout.path().groupElement("size").varHandle(int.class);
+        VarHandle array_elem_handle = layout.path()
+                .groupElement("arr")
+                .sequenceElement(0)
+                .sequenceElement().varHandle(double.class);
         try (MemorySegment segment = MemorySegment.allocateNative(
-                layout.map(l -> ((SequenceLayout)l).withElementCount(4), MemoryLayout.PathElement.groupElement("arr"), MemoryLayout.PathElement.sequenceElement()))) {
+                layout.path().groupElement("arr").sequenceElement().map(l -> ((SequenceLayout)l).withElementCount(4)))) {
             size_handle.set(segment, 4);
             for (int i = 0 ; i < 4 ; i++) {
                 array_elem_handle.set(segment, i, (double)i);
@@ -103,14 +103,14 @@ public class TestLayouts {
     public void testIndexedSequencePath() {
         MemoryLayout seq = MemoryLayout.ofSequence(10, MemoryLayouts.JAVA_INT);
         try (MemorySegment segment = MemorySegment.allocateNative(seq)) {
-            VarHandle indexHandle = seq.varHandle(int.class, MemoryLayout.PathElement.sequenceElement());
+            VarHandle indexHandle = seq.path().sequenceElement().varHandle(int.class);
             // init segment
             for (int i = 0 ; i < 10 ; i++) {
                 indexHandle.set(segment, (long)i, i);
             }
             //check statically indexed handles
             for (int i = 0 ; i < 10 ; i++) {
-                VarHandle preindexHandle = seq.varHandle(int.class, MemoryLayout.PathElement.sequenceElement(i));
+                VarHandle preindexHandle = seq.path().sequenceElement(i).varHandle(int.class);
                 int expected = (int)indexHandle.get(segment, (long)i);
                 int found = (int)preindexHandle.get(segment);
                 assertEquals(expected, found);

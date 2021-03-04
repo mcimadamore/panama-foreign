@@ -118,7 +118,7 @@ public class TestSegments {
     @Test
     public void testNativeSegmentIsZeroed() {
         VarHandle byteHandle = MemoryLayout.ofSequence(MemoryLayouts.JAVA_BYTE)
-                .varHandle(byte.class, MemoryLayout.PathElement.sequenceElement());
+                .path().sequenceElement().varHandle(byte.class);
         try (MemorySegment segment = MemorySegment.allocateNative(1000)) {
             for (long i = 0 ; i < segment.byteSize() ; i++) {
                 assertEquals(0, (byte)byteHandle.get(segment, i));
@@ -129,7 +129,7 @@ public class TestSegments {
     @Test
     public void testSlices() {
         VarHandle byteHandle = MemoryLayout.ofSequence(MemoryLayouts.JAVA_BYTE)
-                .varHandle(byte.class, MemoryLayout.PathElement.sequenceElement());
+                .path().sequenceElement().varHandle(byte.class);
         try (MemorySegment segment = MemorySegment.allocateNative(10)) {
             //init
             for (byte i = 0 ; i < segment.byteSize() ; i++) {
@@ -192,7 +192,7 @@ public class TestSegments {
     @Test(dataProvider = "segmentFactories")
     public void testFill(Supplier<MemorySegment> memorySegmentSupplier) {
         VarHandle byteHandle = MemoryLayout.ofSequence(MemoryLayouts.JAVA_BYTE)
-                .varHandle(byte.class, MemoryLayout.PathElement.sequenceElement());
+                .path().sequenceElement().varHandle(byte.class);
 
         for (byte value : new byte[] {(byte) 0xFF, (byte) 0x00, (byte) 0x45}) {
             try (MemorySegment segment = memorySegmentSupplier.get()) {
@@ -447,7 +447,7 @@ public class TestSegments {
 
         final int accessMode;
 
-        static VarHandle INT_HANDLE = MemoryLayouts.JAVA_INT.varHandle(int.class);
+        static VarHandle INT_HANDLE = MemoryLayouts.JAVA_INT.path().varHandle(int.class);
 
         AccessActions(int accessMode) {
             this.accessMode = accessMode;

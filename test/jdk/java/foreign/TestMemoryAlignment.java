@@ -30,7 +30,6 @@ import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemoryLayout;
 
 import jdk.incubator.foreign.GroupLayout;
-import jdk.incubator.foreign.MemoryLayout.PathElement;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.SequenceLayout;
 import jdk.incubator.foreign.ValueLayout;
@@ -48,7 +47,7 @@ public class TestMemoryAlignment {
         assertEquals(layout.bitAlignment(), 32);
         ValueLayout aligned = layout.withBitAlignment(align);
         assertEquals(aligned.bitAlignment(), align); //unreasonable alignment here, to make sure access throws
-        VarHandle vh = aligned.varHandle(int.class);
+        VarHandle vh = aligned.path().varHandle(int.class);
         try (MemorySegment segment = MemorySegment.allocateNative(aligned)) {
             vh.set(segment, -42);
             int val = (int)vh.get(segment);
@@ -63,7 +62,7 @@ public class TestMemoryAlignment {
         ValueLayout aligned = layout.withBitAlignment(align);
         MemoryLayout alignedGroup = MemoryLayout.ofStruct(MemoryLayouts.PAD_8, aligned);
         assertEquals(alignedGroup.bitAlignment(), align);
-        VarHandle vh = aligned.varHandle(int.class);
+        VarHandle vh = aligned.path().varHandle(int.class);
         try (MemorySegment segment = MemorySegment.allocateNative(alignedGroup)) {
             vh.set(segment.asSlice(1L), -42);
             assertEquals(align, 8); //this is the only case where access is aligned
@@ -78,7 +77,7 @@ public class TestMemoryAlignment {
         MemoryLayout aligned = layout.withBitAlignment(align).withName("value");
         GroupLayout alignedGroup = MemoryLayout.ofStruct(MemoryLayouts.PAD_8, aligned);
         try {
-            alignedGroup.varHandle(int.class, PathElement.groupElement("value"));
+            alignedGroup.path().groupElement("value").varHandle(int.class);
             assertEquals(align, 8); //this is the only case where path is aligned
         } catch (UnsupportedOperationException ex) {
             assertNotEquals(align, 8); //if align != 8, path is always unaligned
@@ -89,7 +88,7 @@ public class TestMemoryAlignment {
     public void testUnalignedSequence(long align) {
         SequenceLayout layout = MemoryLayout.ofSequence(5, MemoryLayouts.BITS_32_BE.withBitAlignment(align));
         try {
-            VarHandle vh = layout.varHandle(int.class, PathElement.sequenceElement());
+            VarHandle vh = layout.path().sequenceElement().varHandle(int.class);
             try (MemorySegment segment = MemorySegment.allocateNative(layout)) {
                 for (long i = 0 ; i < 5 ; i++) {
                     vh.set(segment, i, -42);
@@ -110,9 +109,9 @@ public class TestMemoryAlignment {
                                vShort.withBitAlignment(8).withName("b"),
                                vInt.withBitAlignment(8).withName("c"));
         assertEquals(g.bitAlignment(), 8);
-        VarHandle vh_c = g.varHandle(byte.class, PathElement.groupElement("a"));
-        VarHandle vh_s = g.varHandle(short.class, PathElement.groupElement("b"));
-        VarHandle vh_i = g.varHandle(int.class, PathElement.groupElement("c"));
+        VarHandle vh_c = g.path().groupElement("a").varHandle(byte.class);
+        VarHandle vh_s = g.path().groupElement("b").varHandle(short.class);
+        VarHandle vh_i = g.path().groupElement("c").varHandle(int.class);
         try (MemorySegment segment = MemorySegment.allocateNative(g)) {
             vh_c.set(segment, Byte.MIN_VALUE);
             assertEquals(vh_c.get(segment), Byte.MIN_VALUE);

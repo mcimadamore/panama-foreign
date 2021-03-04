@@ -22,14 +22,11 @@
  *
  */
 
-import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryHandles;
 import jdk.incubator.foreign.MemoryLayout;
-import jdk.incubator.foreign.MemoryLayout.PathElement;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
 import java.lang.invoke.VarHandle;
-import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -55,7 +52,7 @@ public class TestMemoryHandleAsUnsigned {
         byte byteValue = (byte) (intValue & 0xFF);
 
         MemoryLayout layout = MemoryLayouts.BITS_8_BE;
-        VarHandle byteHandle = layout.varHandle(byte.class);
+        VarHandle byteHandle = layout.path().varHandle(byte.class);
         VarHandle intHandle = MemoryHandles.asUnsigned(byteHandle, int.class);
 
         try (MemorySegment segment = MemorySegment.allocateNative(layout)) {
@@ -77,7 +74,7 @@ public class TestMemoryHandleAsUnsigned {
         byte byteValue = (byte) (longValue & 0xFFL);
 
         MemoryLayout layout = MemoryLayouts.BITS_8_BE;
-        VarHandle byteHandle = layout.varHandle(byte.class);
+        VarHandle byteHandle = layout.path().varHandle(byte.class);
         VarHandle longHandle = MemoryHandles.asUnsigned(byteHandle, long.class);
 
         try (MemorySegment segment = MemorySegment.allocateNative(layout)) {
@@ -99,7 +96,7 @@ public class TestMemoryHandleAsUnsigned {
         short shortValue = (short) (intValue & 0xFFFF);
 
         MemoryLayout layout = MemoryLayouts.BITS_16_BE;
-        VarHandle shortHandle = layout.varHandle(short.class);
+        VarHandle shortHandle = layout.path().varHandle(short.class);
         VarHandle intHandle = MemoryHandles.asUnsigned(shortHandle, int.class);
 
         try (MemorySegment segment = MemorySegment.allocateNative(layout)) {
@@ -121,7 +118,7 @@ public class TestMemoryHandleAsUnsigned {
         short shortValue = (short) (longValue & 0xFFFFL);
 
         MemoryLayout layout = MemoryLayouts.BITS_16_BE;
-        VarHandle shortHandle = layout.varHandle(short.class);
+        VarHandle shortHandle = layout.path().varHandle(short.class);
         VarHandle longHandle = MemoryHandles.asUnsigned(shortHandle, long.class);
 
         try (MemorySegment segment = MemorySegment.allocateNative(layout)) {
@@ -147,7 +144,7 @@ public class TestMemoryHandleAsUnsigned {
         int intValue = (int) (longValue & 0xFFFF_FFFFL);
 
         MemoryLayout layout = MemoryLayouts.BITS_32_BE;
-        VarHandle intHandle = layout.varHandle(int.class);
+        VarHandle intHandle = layout.path().varHandle(int.class);
         VarHandle longHandle = MemoryHandles.asUnsigned(intHandle, long.class);
 
         try (MemorySegment segment = MemorySegment.allocateNative(layout)) {
@@ -161,7 +158,7 @@ public class TestMemoryHandleAsUnsigned {
     @Test
     public void testCoordinatesSequenceLayout() {
         MemoryLayout layout = MemoryLayout.ofSequence(2, MemoryLayouts.BITS_8_BE);
-        VarHandle byteHandle = layout.varHandle(byte.class, PathElement.sequenceElement());
+        VarHandle byteHandle = layout.path().sequenceElement().varHandle(byte.class);
         VarHandle intHandle = MemoryHandles.asUnsigned(byteHandle, int.class);
 
         try (MemorySegment segment = MemorySegment.allocateNative(layout)) {
@@ -179,13 +176,13 @@ public class TestMemoryHandleAsUnsigned {
 
         {
             VarHandle byteHandle = MemoryLayout.ofSequence(MemoryLayouts.JAVA_BYTE)
-                    .varHandle(byte.class, PathElement.sequenceElement());
+                    .path().sequenceElement().varHandle(byte.class);
             VarHandle intHandle = MemoryHandles.asUnsigned(byteHandle, int.class);
             assertEquals((int) intHandle.get(segment, 2L), 129);
         }
         {
             VarHandle byteHandle = MemoryLayout.ofSequence(MemoryLayouts.JAVA_BYTE)
-                    .varHandle(byte.class, PathElement.sequenceElement());
+                    .path().sequenceElement().varHandle(byte.class);
             VarHandle intHandle = MemoryHandles.asUnsigned(byteHandle, int.class);
             assertEquals((int) intHandle.get(segment, 2L), 129);
         }

@@ -29,7 +29,6 @@
 
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayout;
-import jdk.incubator.foreign.MemoryLayout.PathElement;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.SequenceLayout;
@@ -75,13 +74,13 @@ public class TestArrays {
             MemoryLayouts.JAVA_DOUBLE
     );
 
-    static VarHandle byteHandle = bytes.varHandle(byte.class, PathElement.sequenceElement());
-    static VarHandle charHandle = chars.varHandle(char.class, PathElement.sequenceElement());
-    static VarHandle shortHandle = shorts.varHandle(short.class, PathElement.sequenceElement());
-    static VarHandle intHandle = ints.varHandle(int.class, PathElement.sequenceElement());
-    static VarHandle floatHandle = floats.varHandle(float.class, PathElement.sequenceElement());
-    static VarHandle longHandle = longs.varHandle(long.class, PathElement.sequenceElement());
-    static VarHandle doubleHandle = doubles.varHandle(double.class, PathElement.sequenceElement());
+    static VarHandle byteHandle = bytes.path().sequenceElement().varHandle(byte.class);
+    static VarHandle charHandle = chars.path().sequenceElement().varHandle(char.class);
+    static VarHandle shortHandle = shorts.path().sequenceElement().varHandle(short.class);
+    static VarHandle intHandle = ints.path().sequenceElement().varHandle(int.class);
+    static VarHandle floatHandle = floats.path().sequenceElement().varHandle(float.class);
+    static VarHandle longHandle = longs.path().sequenceElement().varHandle(long.class);
+    static VarHandle doubleHandle = doubles.path().sequenceElement().varHandle(double.class);
 
     static void initBytes(MemorySegment base, SequenceLayout seq, BiConsumer<MemorySegment, Long> handleSetter) {
         for (long i = 0; i < seq.elementCount().getAsLong() ; i++) {
