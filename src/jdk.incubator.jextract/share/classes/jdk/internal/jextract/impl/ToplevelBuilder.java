@@ -58,6 +58,10 @@ class ToplevelBuilder extends JavaSourceBuilder {
         headers.add(first);
     }
 
+    HeaderFileBuilder firstHeader() {
+        return headers.get(0);
+    }
+
     @Override
     void classBegin() {
         throw new UnsupportedOperationException();
@@ -95,17 +99,17 @@ class ToplevelBuilder extends JavaSourceBuilder {
 
     @Override
     public void addTypedef(String name, String superClass, Type type) {
-        nextHeader().addTypedef(name, superClass, type);
+        firstHeader().addTypedef(name, superClass, type);
     }
 
     @Override
     public StructBuilder addStruct(String name, Declaration parent, GroupLayout layout, Type type) {
-        return nextHeader().addStruct(name, parent, layout, type);
+        return firstHeader().addStruct(name, parent, layout, type);
     }
 
     @Override
     public void addFunctionalInterface(String name, MethodType mtype, FunctionDescriptor desc) {
-        nextHeader().addFunctionalInterface(name, mtype, desc);
+        firstHeader().addFunctionalInterface(name, mtype, desc);
     }
 
     private SplitHeader lastHeader() {
