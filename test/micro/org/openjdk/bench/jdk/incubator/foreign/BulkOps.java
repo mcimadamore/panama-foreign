@@ -159,7 +159,7 @@ public class BulkOps {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public int[] getIntArrayUnsafe() {
-        unsafe.copyMemory(null, segment.address().toRawLongValue() + CARRIER_SIZE * 100, bytes, CARRIER_SIZE * 100, CARRIER_SIZE * 100_000);
+        unsafe.copyMemory(null, segment.address().toRawLongValue() + UNSAFE_INT_OFFSET + CARRIER_SIZE * 100, bytes, CARRIER_SIZE * 100, CARRIER_SIZE * 100_000);
         return bytes;
     }
 }
