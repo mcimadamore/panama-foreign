@@ -24,6 +24,7 @@
 
 package org.openjdk.bench.jdk.incubator.foreign;
 
+import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.ResourceScope;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -37,6 +38,7 @@ import sun.misc.Unsafe;
 
 import jdk.incubator.foreign.MemorySegment;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.concurrent.TimeUnit;
 
 import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
@@ -153,6 +155,13 @@ public class BulkOps {
         MemorySegment dstSeg = MemorySegment.ofArray(bytes);
         MemorySegment dstSegSlice = dstSeg.asSlice(CARRIER_SIZE * 100, CARRIER_SIZE * 100_000);
         dstSegSlice.copyFrom(srcSegSlice);
+        return bytes;
+    }
+
+    @Benchmark
+    @OutputTimeUnit(TimeUnit.NANOSECONDS)
+    public int[] getIntArraySegmentsStatic() {
+        MemoryAccess.getToIntArray(segment, 100, bytes, 100, 100_000, ByteOrder.nativeOrder());
         return bytes;
     }
 

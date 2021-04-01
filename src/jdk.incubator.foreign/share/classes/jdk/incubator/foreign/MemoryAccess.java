@@ -26,6 +26,7 @@
 package jdk.incubator.foreign;
 
 import jdk.internal.access.foreign.MemorySegmentProxy;
+import jdk.internal.foreign.AbstractMemorySegmentImpl;
 import jdk.internal.vm.annotation.ForceInline;
 
 import java.lang.invoke.VarHandle;
@@ -1452,4 +1453,31 @@ public final class MemoryAccess {
     private static long scale(MemorySegment address, long index, int size) {
         return MemorySegmentProxy.multiplyOffsets(index, size, (MemorySegmentProxy)address);
     }
+
+    @ForceInline
+    public static void getToIntArray(MemorySegment segment, long srcIndex, int[] arr, int dstIndex, int nElems, ByteOrder order) {
+        MemorySegment srcSegSlice = segment.asSlice(srcIndex << 2, nElems << 2);
+        MemorySegment dstSeg = MemorySegment.ofArray(arr);
+        MemorySegment dstSegSlice = dstSeg.asSlice(dstIndex << 2, nElems << 2);
+        if (order == ByteOrder.nativeOrder()) {
+            dstSegSlice.copyFrom(srcSegSlice);
+        } else {
+            ((AbstractMemorySegmentImpl)dstSegSlice).copyFromSwap(srcSegSlice, 4);
+        }
+    }
+
+    @ForceInline
+    public static void setFromIntArray(MemorySegment segment, long dstIndex, int[] arr, int srcIndex, int nElems, ByteOrder order) {
+        MemorySegment dstSegSlice = segment.asSlice(dstIndex << 2, nElems << 2);
+        MemorySegment srcSeg = MemorySegment.ofArray(arr);
+        MemorySegment srcSegSlice = srcSeg.asSlice(srcIndex << 2, nElems << 2);
+        if (order == ByteOrder.nativeOrder()) {
+            dstSegSlice.copyFrom(srcSegSlice);
+        } else {
+            ((AbstractMemorySegmentImpl)dstSegSlice).copyFromSwap(srcSegSlice, 4);
+        }
+    }
+
+    // repeat for all carriers, maybe add offset vs. index overloads (to allow finer grained segment access), and
+    // endianness defaults
 }
