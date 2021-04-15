@@ -32,8 +32,8 @@ import jdk.incubator.foreign.LibraryLookup;
 import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
-import jdk.internal.loader.NativeLibraries;
 import jdk.internal.loader.NativeLibrary;
+import jdk.internal.loader.NativeLibraries;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 

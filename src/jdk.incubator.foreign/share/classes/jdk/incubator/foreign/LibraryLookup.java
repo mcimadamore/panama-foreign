@@ -26,6 +26,7 @@
 package jdk.incubator.foreign;
 
 import jdk.internal.foreign.LibrariesHelper;
+import jdk.internal.foreign.StdLibC;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 
@@ -106,7 +107,7 @@ public interface LibraryLookup {
         if (security != null) {
             security.checkPermission(new RuntimePermission("java.foreign.getDefaultLibrary"));
         }
-        return LibrariesHelper.getDefaultLibrary();
+        return StdLibC.getInstance();
     }
 
     /**
