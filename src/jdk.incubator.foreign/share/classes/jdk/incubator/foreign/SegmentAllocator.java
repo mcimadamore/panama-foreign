@@ -400,39 +400,4 @@ public interface SegmentAllocator {
                 new ArenaAllocator.UnboundedSharedArenaAllocator(scope) :
                 new ArenaAllocator(scope);
     }
-
-    /**
-     * Returns a segment allocator which responds to allocation requests by recycling a single segment; that is,
-     * each new allocation request will return a new slice starting at the segment offset {@code 0} (alignment
-     * constraints are ignored by this allocator). This can be useful to limit allocation requests in case a client
-     * knows that they have fully processed the contents of the allocated segment before the subsequent allocation request
-     * takes place.
-     * <p>
-     * While the allocator returned by this method is <em>thread-safe</em>, concurrent access on the same recycling
-     * allocator might cause a thread to overwrite contents written to the underlying segment by a different thread.
-     *
-     * @param segment the memory segment to be recycled by the returned allocator.
-     * @return an allocator which recycles an existing segment upon each new allocation request.
-     */
-    static SegmentAllocator ofSegment(MemorySegment segment) {
-        Objects.requireNonNull(segment);
-        return (size, align) -> segment.asSlice(0, size);
-    }
-
-    /**
-     * Returns a native allocator which responds to allocation requests by allocating new segments
-     * bound by the given resource scope, using the {@link MemorySegment#allocateNative(long, long, ResourceScope)}
-     * factory. This code is equivalent (but likely more efficient) to the following:
-     * <blockquote><pre>{@code
-    Resource scope = ...
-    SegmentAllocator scoped = (size, align) -> MemorySegment.allocateNative(size, align, scope);
-     * }</pre></blockquote>
-     *
-     * @param scope the resource scope associated to the segments created by the returned allocator.
-     * @return an allocator which allocates new memory segment bound by the provided resource scope.
-     */
-    static SegmentAllocator ofScope(ResourceScope scope) {
-        Objects.requireNonNull(scope);
-        return (ResourceScopeImpl)scope;
-    }
 }

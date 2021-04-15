@@ -293,8 +293,7 @@ public class StdLibTest {
         int[] qsort(int[] arr) throws Throwable {
             //init native array
             try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-                SegmentAllocator allocator = SegmentAllocator.ofScope(scope);
-                MemorySegment nativeArr = allocator.allocateArray(C_INT, arr);
+                MemorySegment nativeArr = scope.allocateArray(C_INT, arr);
 
                 //call qsort
                 MemoryAddress qsortUpcallStub = abi.upcallStub(qsortCompar.bindTo(nativeArr), qsortComparFunction, scope);

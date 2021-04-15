@@ -201,7 +201,7 @@ public class VaListTest extends NativeTestHelper {
                                         Function<VaList, Integer> getFromPointer,
                                         ValueLayout pointerLayout) {
         try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment msInt = MemorySegment.allocateNative(JAVA_INT, scope);
+            MemorySegment msInt = scope.allocate(JAVA_INT);
             MemoryAccess.setInt(msInt, 10);
             VaList vaList = vaListFactory.apply(b -> b.vargFromAddress(pointerLayout, msInt.address()));
             int x = getFromPointer.apply(vaList);
@@ -255,7 +255,7 @@ public class VaListTest extends NativeTestHelper {
                            Function<VaList, Integer> sumStruct,
                            GroupLayout Point_LAYOUT, VarHandle VH_Point_x, VarHandle VH_Point_y) {
         try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment struct = MemorySegment.allocateNative(Point_LAYOUT, scope);
+            MemorySegment struct = scope.allocate(Point_LAYOUT);
             VH_Point_x.set(struct, 5);
             VH_Point_y.set(struct, 10);
 
@@ -307,7 +307,7 @@ public class VaListTest extends NativeTestHelper {
                               Function<VaList, Long> sumBigStruct,
                               GroupLayout BigPoint_LAYOUT, VarHandle VH_BigPoint_x, VarHandle VH_BigPoint_y) {
         try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment struct = MemorySegment.allocateNative(BigPoint_LAYOUT, scope);
+            MemorySegment struct = scope.allocate(BigPoint_LAYOUT);
             VH_BigPoint_x.set(struct, 5);
             VH_BigPoint_y.set(struct, 10);
 
@@ -360,7 +360,7 @@ public class VaListTest extends NativeTestHelper {
                                 GroupLayout FloatPoint_LAYOUT,
                                 VarHandle VH_FloatPoint_x, VarHandle VH_FloatPoint_y) {
         try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment struct = MemorySegment.allocateNative(FloatPoint_LAYOUT, scope);
+            MemorySegment struct = scope.allocate(FloatPoint_LAYOUT);
             VH_FloatPoint_x.set(struct, 1.234f);
             VH_FloatPoint_y.set(struct, 3.142f);
 
@@ -423,7 +423,7 @@ public class VaListTest extends NativeTestHelper {
         // On AArch64 a struct needs to be larger than 16 bytes to be
         // passed by reference.
         try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment struct = MemorySegment.allocateNative(HugePoint_LAYOUT, scope);
+            MemorySegment struct = scope.allocate(HugePoint_LAYOUT);
             VH_HugePoint_x.set(struct, 1);
             VH_HugePoint_y.set(struct, 2);
             VH_HugePoint_z.set(struct, 3);
@@ -475,8 +475,8 @@ public class VaListTest extends NativeTestHelper {
                           ValueLayout longLayout,
                           ValueLayout doubleLayout) {
         try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment longSum = MemorySegment.allocateNative(longLayout, scope);
-            MemorySegment doubleSum = MemorySegment.allocateNative(doubleLayout, scope);
+            MemorySegment longSum = scope.allocate(longLayout);
+            MemorySegment doubleSum = scope.allocate(doubleLayout);
             MemoryAccess.setLong(longSum, 0L);
             MemoryAccess.setDouble(doubleSum, 0D);
 
@@ -569,7 +569,7 @@ public class VaListTest extends NativeTestHelper {
         MemorySegment pointOut;
         try (NativeScope scope = new NativeScope()) {
             try (ResourceScope innerScope = ResourceScope.newConfinedScope()) {
-                MemorySegment pointIn = MemorySegment.allocateNative(Point_LAYOUT, innerScope);
+                MemorySegment pointIn = innerScope.allocate(Point_LAYOUT);
                 VH_Point_x.set(pointIn, 3);
                 VH_Point_y.set(pointIn, 6);
                 VaList list = vaListFactory.apply(b -> b.vargFromSegment(Point_LAYOUT, pointIn));

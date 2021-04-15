@@ -213,11 +213,6 @@ public class SysVVaList implements VaList {
         return (MemorySegment) read(MemorySegment.class, layout, allocator);
     }
 
-    @Override
-    public MemorySegment vargAsSegment(MemoryLayout layout, ResourceScope scope) {
-        return vargAsSegment(layout, SegmentAllocator.ofScope(scope));
-    }
-
     private Object read(Class<?> carrier, MemoryLayout layout) {
         return read(carrier, layout, THROWING_ALLOCATOR);
     }

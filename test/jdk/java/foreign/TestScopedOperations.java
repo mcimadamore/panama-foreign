@@ -217,10 +217,9 @@ public class TestScopedOperations {
             ARENA_BOUNDED(scope -> SegmentAllocator.arenaAllocator(1000, scope)),
             ARENA_UNBOUNDED(SegmentAllocator::arenaAllocator),
             FROM_SEGMENT(scope -> {
-                MemorySegment segment = MemorySegment.allocateNative(10, scope);
-                return SegmentAllocator.ofSegment(segment);
+                return MemorySegment.allocateNative(10, scope);
             }),
-            FROM_SCOPE(SegmentAllocator::ofScope);
+            FROM_SCOPE(scope -> scope);
 
             final Function<ResourceScope, SegmentAllocator> allocatorFactory;
 

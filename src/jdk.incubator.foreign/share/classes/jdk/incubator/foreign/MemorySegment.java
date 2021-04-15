@@ -143,7 +143,7 @@ try (ResourceScope scope = ResourceScope.newSharedScope()) {
  * @implSpec
  * Implementations of this interface are immutable, thread-safe and <a href="{@docRoot}/java.base/java/lang/doc-files/ValueBased.html">value-based</a>.
  */
-public interface MemorySegment extends Addressable {
+public interface MemorySegment extends Addressable, SegmentAllocator {
 
     /**
      * The base memory address associated with this memory segment.
@@ -613,16 +613,24 @@ for (long l = 0; l < segment.byteSize(); l++) {
      */
     static MemorySegment allocateNative(long bytesSize, long alignmentBytes, ResourceScope scope) {
         Objects.requireNonNull(scope);
-        if (bytesSize <= 0) {
-            throw new IllegalArgumentException("Invalid allocation size : " + bytesSize);
-        }
+        return scope.allocate(bytesSize, alignmentBytes);
+    }
 
-        if (alignmentBytes <= 0 ||
-                ((alignmentBytes & (alignmentBytes - 1)) != 0L)) {
-            throw new IllegalArgumentException("Invalid alignment constraint : " + alignmentBytes);
-        }
-
-        return NativeMemorySegmentImpl.makeNativeSegment(bytesSize, alignmentBytes, (ResourceScopeImpl) scope);
+    /**
+     * Returns a segment allocator which responds to allocation requests by recycling a single segment; that is,
+     * each new allocation request will return a new slice starting at the segment offset {@code 0} (alignment
+     * constraints are ignored by this allocator). This can be useful to limit allocation requests in case a client
+     * knows that they have fully processed the contents of the allocated segment before the subsequent allocation request
+     * takes place.
+     * <p>
+     * While the allocator returned by this method is <em>thread-safe</em>, concurrent access on the same recycling
+     * allocator might cause a thread to overwrite contents written to the underlying segment by a different thread.
+     *
+     * @return an allocator which recycles an existing segment upon each new allocation request.
+     */
+    @Override
+    default MemorySegment allocate(long bytesSize, long align) {
+        return SegmentAllocator.super.allocate(bytesSize);
     }
 
     /**

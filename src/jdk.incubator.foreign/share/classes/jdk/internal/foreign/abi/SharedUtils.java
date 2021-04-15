@@ -569,11 +569,6 @@ public class SharedUtils {
         }
 
         @Override
-        public MemorySegment vargAsSegment(MemoryLayout layout, ResourceScope scope) {
-            throw uoe();
-        }
-
-        @Override
         public void skip(MemoryLayout... layouts) {
             throw uoe();
         }

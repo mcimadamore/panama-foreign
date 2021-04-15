@@ -130,7 +130,7 @@ try (ResourceScope.Handle segmentHandle = segment.scope().acquire()) {
  * @implSpec
  * Implementations of this interface are immutable, thread-safe and <a href="{@docRoot}/java.base/java/lang/doc-files/ValueBased.html">value-based</a>.
  */
-public interface ResourceScope extends AutoCloseable {
+public interface ResourceScope extends AutoCloseable, SegmentAllocator {
     /**
      * Is this resource scope alive?
      * @return true, if this resource scope is alive.
@@ -203,6 +203,21 @@ public interface ResourceScope extends AutoCloseable {
          */
         @Override
         void close();
+    }
+
+    /**
+     * Returns a native allocator which responds to allocation requests by allocating new segments
+     * bound by the given resource scope, using the {@link MemorySegment#allocateNative(long, long, ResourceScope)}
+     * factory. This code is equivalent (but likely more efficient) to the following:
+     * <blockquote><pre>{@code
+    Resource scope = ...
+    SegmentAllocator scoped = (size, align) -> MemorySegment.allocateNative(size, align, scope);
+     * }</pre></blockquote>
+     *
+     * @return an allocator which allocates new memory segment bound by the provided resource scope.
+     */
+    default MemorySegment allocate(long bytesSize, long align) {
+        return ((ResourceScopeImpl)this).allocate(bytesSize, align);
     }
 
     /**

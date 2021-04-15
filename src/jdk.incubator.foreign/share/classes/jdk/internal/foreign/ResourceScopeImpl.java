@@ -183,8 +183,17 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
      * Allocates a segment using this scope. Used by {@link SegmentAllocator#ofScope(ResourceScope)}.
      */
     @Override
-    public MemorySegment allocate(long bytesSize, long bytesAlignment) {
-        return MemorySegment.allocateNative(bytesSize, bytesAlignment, this);
+    public MemorySegment allocate(long bytesSize, long alignmentBytes) {
+        if (bytesSize <= 0) {
+            throw new IllegalArgumentException("Invalid allocation size : " + bytesSize);
+        }
+
+        if (alignmentBytes <= 0 ||
+                ((alignmentBytes & (alignmentBytes - 1)) != 0L)) {
+            throw new IllegalArgumentException("Invalid alignment constraint : " + alignmentBytes);
+        }
+
+        return NativeMemorySegmentImpl.makeNativeSegment(bytesSize, alignmentBytes, this);
     }
 
     /**

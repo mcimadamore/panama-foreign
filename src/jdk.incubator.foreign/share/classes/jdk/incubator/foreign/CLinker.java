@@ -288,23 +288,6 @@ public interface CLinker {
     }
 
     /**
-     * Converts a Java string into a null-terminated C string, using the platform's default charset,
-     * storing the result into a native memory segment associated with the provided resource scope.
-     * <p>
-     * This method always replaces malformed-input and unmappable-character
-     * sequences with this charset's default replacement byte array.  The
-     * {@link java.nio.charset.CharsetEncoder} class should be used when more
-     * control over the encoding process is required.
-     *
-     * @param str the Java string to be converted into a C string.
-     * @param scope the resource scope to be associated with the returned segment.
-     * @return a new native memory segment containing the converted C string.
-     */
-    static MemorySegment toCString(String str, ResourceScope scope) {
-        return toCString(str, SegmentAllocator.ofScope(scope));
-    }
-
-    /**
      * Converts a Java string into a null-terminated C string, using the given {@link java.nio.charset.Charset charset},
      * storing the result into a new native memory segment native memory segment allocated using the provided allocator.
      * <p>
@@ -323,24 +306,6 @@ public interface CLinker {
         Objects.requireNonNull(charset);
         Objects.requireNonNull(allocator);
         return toCString(str.getBytes(charset), allocator);
-    }
-
-    /**
-     * Converts a Java string into a null-terminated C string, using the given {@link java.nio.charset.Charset charset},
-     * storing the result into a native memory segment associated with the provided resource scope.
-     * <p>
-     * This method always replaces malformed-input and unmappable-character
-     * sequences with this charset's default replacement byte array.  The
-     * {@link java.nio.charset.CharsetEncoder} class should be used when more
-     * control over the encoding process is required.
-     *
-     * @param str the Java string to be converted into a C string.
-     * @param charset The {@link java.nio.charset.Charset} to be used to compute the contents of the C string.
-     * @param scope the resource scope to be associated with the returned segment.
-     * @return a new native memory segment containing the converted C string.
-     */
-    static MemorySegment toCString(String str, Charset charset, ResourceScope scope) {
-        return toCString(str, charset, SegmentAllocator.ofScope(scope));
     }
 
     /**
@@ -563,20 +528,6 @@ public interface CLinker {
          * @throws IllegalArgumentException if the given memory layout is not compatible with {@code MemorySegment}
          */
         MemorySegment vargAsSegment(MemoryLayout layout, SegmentAllocator allocator);
-
-        /**
-         * Reads the next value as a {@code MemorySegment}, and advances this va list's position.
-         * <p>
-         * The memory segment returned by this method will be associated with the given {@link ResourceScope}.
-         *
-         * @param layout the layout of the value
-         * @param scope the resource scope to be associated with the returned segment
-         * @return the value read as an {@code MemorySegment}
-         * @throws IllegalStateException if the resource scope associated with this instance has been closed
-         * (see {@link #scope()}).
-         * @throws IllegalArgumentException if the given memory layout is not compatible with {@code MemorySegment}
-         */
-        MemorySegment vargAsSegment(MemoryLayout layout, ResourceScope scope);
 
         /**
          * Skips a number of elements with the given memory layouts, and advances this va list's position.
