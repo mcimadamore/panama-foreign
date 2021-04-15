@@ -30,6 +30,7 @@ import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemorySegment;
 
+import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -338,7 +339,7 @@ public class StdLibC implements LibraryLookup {
 
     final LibraryLookup lookup = switch (CABI.current()) {
         case SysV, AArch64 -> LibrariesHelper.getDefaultLibrary();
-        case Win64 -> LibraryLookup.ofLibrary("msvcrt");
+        case Win64 -> LibraryLookup.ofPath(Path.of(System.getenv("SystemRoot"), "System32", "msvcrt.dll")); // do not depend on java.library.path!
     };
 
     @Override
