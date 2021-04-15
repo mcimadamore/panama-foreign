@@ -35,6 +35,8 @@ import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.internal.foreign.LibrariesHelper;
+import jdk.internal.foreign.StdLibC;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.lang.reflect.Field;
@@ -154,6 +156,12 @@ public class TestLibraryLookup {
         waitUnload();
     }
 
+    @Test(dataProvider = "clibsyms")
+    public void testDefaultLookup(String sym) throws Throwable {
+        LibraryLookup defaultLookup = LibraryLookup.ofDefault();
+        assertTrue(defaultLookup.lookup(sym).isPresent());
+    }
+
     static class LocalLoader extends URLClassLoader {
         public LocalLoader() throws Exception {
             super(new URL[] { Path.of(System.getProperty("test.classes")).toUri().toURL() });
@@ -199,4 +207,12 @@ public class TestLibraryLookup {
             Thread.sleep(1);
         }
     }
+
+    @DataProvider(name = "clibsyms")
+    Object[][] clibSyms() {
+        return StdLibC.symbols.stream()
+                .map(s -> new Object[] { s })
+                .toArray(Object[][]::new);
+    }
+
 }
