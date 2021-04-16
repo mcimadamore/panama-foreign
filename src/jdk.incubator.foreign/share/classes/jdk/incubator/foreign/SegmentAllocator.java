@@ -65,7 +65,7 @@ try (ResourceScope scope = ResourceScope.newConfinedScope()) {
  * then allocation is confined to the owning thread of the allocator's resource scope.
  */
 @FunctionalInterface
-public interface SegmentAllocator {
+public interface SegmentAllocator extends AutoCloseable {
 
     /**
      * Allocate a block of memory with given layout and initialize it with given byte value.
@@ -339,6 +339,28 @@ public interface SegmentAllocator {
      */
     default MemorySegment allocate(long bytesSize) {
         return allocate(bytesSize, 1);
+    }
+
+    /**
+     * Returns the scope associated with this segment allocator.
+     * @implSpec
+     * The default implementation always return ths {@link ResourceScope#globalScope() global} resource scope.
+     * @return the scope associated with this segment allocator.
+     */
+    default ResourceScope scope() {
+        return ResourceScope.globalScope();
+    }
+
+    /**
+     * Closes the {@link #scope() resource scope} associated with this allocator.
+     * @implSpec
+     * The default implementation is equivalent to the following code:
+     * <blockquote><pre>{@code
+scope().close()
+     * }</pre></blockquote>
+     */
+    default void close() {
+        scope().close();
     }
 
     /**

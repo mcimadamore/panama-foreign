@@ -187,6 +187,11 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
         return MemorySegment.allocateNative(bytesSize, bytesAlignment, this);
     }
 
+    @Override
+    public ResourceScope scope() {
+        return this;
+    }
+
     /**
      * A non-closeable, shared scope. Similar to a shared scope, but its {@link #close()} method throws unconditionally.
      * In addition, non-closeable scopes feature a much simpler scheme for generating resource scope handles, where

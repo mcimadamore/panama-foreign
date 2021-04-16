@@ -359,8 +359,8 @@ public class VaListTest extends NativeTestHelper {
                                 Function<VaList, Float> sumFloatStruct,
                                 GroupLayout FloatPoint_LAYOUT,
                                 VarHandle VH_FloatPoint_x, VarHandle VH_FloatPoint_y) {
-        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment struct = MemorySegment.allocateNative(FloatPoint_LAYOUT, scope);
+        try (var allocator = SegmentAllocator.ofScope(ResourceScope.newConfinedScope())) {
+            MemorySegment struct = allocator.allocate(FloatPoint_LAYOUT);
             VH_FloatPoint_x.set(struct, 1.234f);
             VH_FloatPoint_y.set(struct, 3.142f);
 
@@ -422,8 +422,8 @@ public class VaListTest extends NativeTestHelper {
                                VarHandle VH_HugePoint_x, VarHandle VH_HugePoint_y, VarHandle VH_HugePoint_z) {
         // On AArch64 a struct needs to be larger than 16 bytes to be
         // passed by reference.
-        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment struct = MemorySegment.allocateNative(HugePoint_LAYOUT, scope);
+        try (var allocator = SegmentAllocator.ofScope(ResourceScope.newConfinedScope())) {
+            MemorySegment struct = allocator.allocate(HugePoint_LAYOUT);
             VH_HugePoint_x.set(struct, 1);
             VH_HugePoint_y.set(struct, 2);
             VH_HugePoint_z.set(struct, 3);
@@ -474,9 +474,9 @@ public class VaListTest extends NativeTestHelper {
                           SumStackFunc sumStack,
                           ValueLayout longLayout,
                           ValueLayout doubleLayout) {
-        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            MemorySegment longSum = MemorySegment.allocateNative(longLayout, scope);
-            MemorySegment doubleSum = MemorySegment.allocateNative(doubleLayout, scope);
+        try (var allocator = SegmentAllocator.ofScope(ResourceScope.newConfinedScope())) {
+            MemorySegment longSum = allocator.allocate(longLayout);
+            MemorySegment doubleSum = allocator.allocate(doubleLayout);
             MemoryAccess.setLong(longSum, 0L);
             MemoryAccess.setDouble(doubleSum, 0D);
 

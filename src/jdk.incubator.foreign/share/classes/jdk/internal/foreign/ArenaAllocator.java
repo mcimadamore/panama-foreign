@@ -25,6 +25,11 @@ public class ArenaAllocator implements SegmentAllocator {
         this.segment = allocator.allocate(initialSize, 1);
     }
 
+    @Override
+    public ResourceScope scope() {
+        return segment.scope();
+    }
+
     MemorySegment newSegment(long size, long align) {
         return allocator.allocate(size, align);
     }
