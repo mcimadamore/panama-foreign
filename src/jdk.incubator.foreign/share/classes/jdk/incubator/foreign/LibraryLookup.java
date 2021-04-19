@@ -25,7 +25,10 @@
  */
 package jdk.incubator.foreign;
 
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 import jdk.internal.foreign.LibrariesHelper;
+import jdk.internal.loader.NativeLibraries;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
 
@@ -102,11 +105,32 @@ public interface LibraryLookup {
     @CallerSensitive
     static LibraryLookup ofDefault() {
         Reflection.ensureNativeAccess(Reflection.getCallerClass());
+        ClassLoader loader = Reflection.getCallerClass().getClassLoader();
         SecurityManager security = System.getSecurityManager();
+        JavaLangAccess javaLangAccess = SharedSecrets.getJavaLangAccess();
         if (security != null) {
             security.checkPermission(new RuntimePermission("java.foreign.getDefaultLibrary"));
         }
-        return LibrariesHelper.getDefaultLibrary();
+        return new LibraryLookup() {
+
+            private long find(String name) {
+                return javaLangAccess.findNative(loader, name);
+            }
+
+            @Override
+            public Optional<MemoryAddress> lookup(String name) {
+                Objects.requireNonNull(name);
+                long addr = find(name);
+                return addr == 0 ? Optional.empty() : Optional.of(MemoryAddress.ofLong(addr));
+            }
+
+            @Override
+            public Optional<MemorySegment> lookup(String name, MemoryLayout layout) {
+                Objects.requireNonNull(name);
+                long addr = find(name);
+                return addr == 0 ? Optional.empty() : Optional.of(MemoryAddress.ofLong(addr).asSegment(layout.byteSize(), ResourceScope.globalScope()));
+            }
+        };
     }
 
     /**
