@@ -61,6 +61,9 @@ public class ResourceScopeClose {
     @Param({"NONE", "MEMORY", "THREADS"})
     StressMode mode;
 
+    @Param({"false", "true"})
+    boolean allocate;
+
     List<byte[]> arrays;
     volatile boolean stop = false;
     List<Thread> threads;
@@ -105,26 +108,30 @@ public class ResourceScopeClose {
     @Benchmark
     public MemorySegment confined_close() {
         try (ResourceScope scope = ResourceScope.newConfinedScope()) {
-            return MemorySegment.allocateNative(ALLOC_SIZE, 4, scope);
+            return allocate ?
+                    MemorySegment.allocateNative(ALLOC_SIZE, 4, scope) : null;
         }
     }
 
     @Benchmark
     public MemorySegment shared_close() {
         try (ResourceScope scope = ResourceScope.newSharedScope()) {
-            return MemorySegment.allocateNative(ALLOC_SIZE, 4, scope);
+            return allocate ?
+                    MemorySegment.allocateNative(ALLOC_SIZE, 4, scope) : null;
         }
     }
 
     @Benchmark
     public MemorySegment implicit_close() {
-        return MemorySegment.allocateNative(ALLOC_SIZE, 4, ResourceScope.newImplicitScope());
+        return allocate ?
+                MemorySegment.allocateNative(ALLOC_SIZE, 4, ResourceScope.newImplicitScope()) : null;
     }
 
     @Benchmark
     public MemorySegment implicit_close_systemgc() {
         if (gcCount++ == 0) System.gc(); // GC when we overflow
-        return MemorySegment.allocateNative(ALLOC_SIZE, 4, ResourceScope.newImplicitScope());
+        return allocate ?
+            MemorySegment.allocateNative(ALLOC_SIZE, 4, ResourceScope.newImplicitScope()) : null;
     }
 
     // keep

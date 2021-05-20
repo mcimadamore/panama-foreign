@@ -831,7 +831,7 @@ public abstract class Buffer {
                     if (async && scope.ownerThread() != null) {
                         throw new IllegalStateException("Confined scope not supported");
                     }
-                    scope.keep(opScope);
+                    scope.bindTo(opScope);
                 }
 
                 @Override

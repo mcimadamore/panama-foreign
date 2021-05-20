@@ -108,7 +108,7 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
     abstract void release();
 
     @Override
-    public final void keep(ScopedMemoryAccess.Scope scope) {
+    public final void bindTo(ScopedMemoryAccess.Scope scope) {
         bindTo((ResourceScope)scope);
     }
 

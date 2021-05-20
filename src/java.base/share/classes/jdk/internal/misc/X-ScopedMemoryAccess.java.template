@@ -108,7 +108,7 @@ public class ScopedMemoryAccess {
 
         void close();
 
-        void keep(Scope scope);
+        void bindTo(Scope scope);
 
         static Scope newConfinedScope() {
             return confinedScopeSupplier.get();
@@ -165,7 +165,7 @@ public class ScopedMemoryAccess {
                                         }
 
                                         @Override
-                                        public void keep(Scope scope) {
+                                        public void bindTo(Scope scope) {
 
                                         }
                                     }; } };
