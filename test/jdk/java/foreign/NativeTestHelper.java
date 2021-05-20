@@ -53,7 +53,7 @@ public class NativeTestHelper {
         public NativeScope() {
             this.resourceScope = ResourceScope.newConfinedScope();
             this.internalScope = ResourceScope.newConfinedScope();
-            resourceScope.keep(internalScope);
+            resourceScope.bindTo(internalScope);
             this.allocator = SegmentAllocator.arenaAllocator(resourceScope);
         }
 

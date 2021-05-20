@@ -25,7 +25,6 @@
 
 package sun.nio.ch;
 
-import java.lang.ref.Reference;
 import java.nio.channels.*;
 import java.nio.ByteBuffer;
 import java.net.*;
@@ -534,9 +533,9 @@ class UnixAsynchronousSocketChannelImpl
                 synchronized (updateLock) {
                     this.isScatteringRead = isScatteringRead;
                     if (dst == null) {
-                        IOUtil.keepScopes(dsts, scope);
+                        IOUtil.bindToScopes(dsts, scope);
                     } else {
-                        IOUtil.keepScope(dst, true, scope);
+                        IOUtil.bindToScope(dst, true, scope);
                     }
                     this.readScope = scope;
                     this.readBuffer = dst;
@@ -729,9 +728,9 @@ class UnixAsynchronousSocketChannelImpl
                 synchronized (updateLock) {
                     this.isGatheringWrite = isGatheringWrite;
                     if (src == null) {
-                        IOUtil.keepScopes(srcs, scope);
+                        IOUtil.bindToScopes(srcs, scope);
                     } else {
-                        IOUtil.keepScope(src, true, scope);
+                        IOUtil.bindToScope(src, true, scope);
                     }
                     this.writeScope = scope;
                     this.writeBuffer = src;

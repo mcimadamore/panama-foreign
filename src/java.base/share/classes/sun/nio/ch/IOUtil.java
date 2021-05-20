@@ -27,9 +27,7 @@ package sun.nio.ch;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.lang.ref.Reference;
 import java.nio.ByteBuffer;
-import java.util.Objects;
 
 import jdk.internal.access.JavaNioAccess;
 import jdk.internal.access.SharedSecrets;
@@ -127,7 +125,7 @@ public class IOUtil {
         if (rem == 0)
             return 0;
         try (var scope = Scope.newConfinedScope()) {
-            keepScope(bb, async, scope);
+            bindToScope(bb, async, scope);
             if (position != -1) {
                 written = nd.pwrite(fd, bufferAddress(bb) + pos, rem, position);
             } else {
@@ -176,7 +174,7 @@ public class IOUtil {
             int i = offset;
             while (i < count && iov_len < IOV_MAX) {
                 ByteBuffer buf = bufs[i];
-                keepScope(buf, async, scope);
+                bindToScope(buf, async, scope);
                 int pos = buf.position();
                 int lim = buf.limit();
                 assert (pos <= lim);
@@ -319,7 +317,7 @@ public class IOUtil {
             return 0;
         int n = 0;
         try (var scope = Scope.newConfinedScope()) {
-            keepScope(bb, async, scope);
+            bindToScope(bb, async, scope);
             if (position != -1) {
                 n = nd.pread(fd, bufferAddress(bb) + pos, rem, position);
             } else {
@@ -377,7 +375,7 @@ public class IOUtil {
                 ByteBuffer buf = bufs[i];
                 if (buf.isReadOnly())
                     throw new IllegalArgumentException("Read-only buffer");
-                keepScope(buf, async, scope);
+                bindToScope(buf, async, scope);
                 int pos = buf.position();
                 int lim = buf.limit();
                 assert (pos <= lim);
@@ -454,13 +452,13 @@ public class IOUtil {
 
     private static final JavaNioAccess NIO_ACCESS = SharedSecrets.getJavaNioAccess();
 
-    static void keepScope(ByteBuffer bb, boolean async, Scope opScope) {
-        NIO_ACCESS.keep(bb, async, opScope);
+    static void bindToScope(ByteBuffer bb, boolean async, Scope opScope) {
+        NIO_ACCESS.bindToScope(bb, async, opScope);
     }
 
-    static void keepScopes(ByteBuffer[] buffers, Scope opScope) {
+    static void bindToScopes(ByteBuffer[] buffers, Scope opScope) {
         for (ByteBuffer bb : buffers) {
-            keepScope(bb, true, opScope);
+            bindToScope(bb, true, opScope);
         }
     }
 

@@ -823,7 +823,7 @@ public abstract class Buffer {
                 }
 
                 @Override
-                public void keep(Buffer buffer, boolean async, Scope opScope) {
+                public void bindToScope(Buffer buffer, boolean async, Scope opScope) {
                     var scope = buffer.scope();
                     if (scope == null) {
                         return;

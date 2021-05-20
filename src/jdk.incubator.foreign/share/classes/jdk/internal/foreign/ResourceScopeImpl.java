@@ -109,11 +109,11 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
 
     @Override
     public final void keep(ScopedMemoryAccess.Scope scope) {
-        keep((ResourceScope)scope);
+        bindTo((ResourceScope)scope);
     }
 
     @Override
-    public final void keep(ResourceScope scope) {
+    public final void bindTo(ResourceScope scope) {
         Objects.requireNonNull(scope);
         if (scope == this) {
             throw new IllegalArgumentException("Cannot bind a scope to itself");

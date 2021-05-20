@@ -115,27 +115,24 @@ try (ResourceScope scope = ResourceScope.newSharedScope()) {
  * should always ensure that proper synchronization mechanisms (e.g. using resource scope handles, see below) are put in place
  * so that threads closing shared resource scopes can never race against threads accessing resources managed by same scopes.
  *
- * <h2>Resource scope handles</h2>
+ * <h2>Bound resource scopes</h2>
  *
- * Resource scopes can be made <em>non-closeable</em> by acquiring one or more resource scope <em>handles</em> (see
- * {@link #acquire()}. A resource scope handle can be used to make sure that resources associated with a given resource scope
- * (either explicit or implicit) cannot be released for a certain period of time - e.g. during a critical region of code
- * involving one or more resources associated with the scope. For instance, an explicit resource scope can only be closed
- * <em>after</em> all the handles acquired against that scope have been closed (see {@link Handle#close()}).
+ * Resource scopes can be made <em>non-closeable</em> by {@link #bindTo(ResourceScope)} binding) them to one or more
+ * other resource scopes. A resource scope that is bound to another resource scope cannot be released (either implicitly or explicitly)
+ * until <em>all</em> the resource scopes it is bound to have also been released.
+ * <p>
  * This can be useful when clients need to perform a critical operation on a memory segment, during which they have
  * to ensure that the segment will not be released; this can be done as follows:
  *
  * <blockquote><pre>{@code
 MemorySegment segment = ...
-ResourceScope.Handle segmentHandle = segment.scope().acquire()
-try {
+try (ResourceScope criticalScope = ResourceScope.newConfinedScope()) {
+   segment.scope().bindTo(criticalScope);
    <critical operation on segment>
-} finally {
-   segment.scope().release(segmentHandle);
 }
  * }</pre></blockquote>
  *
- * Acquiring implicit resource scopes is also possible, but it is often unnecessary: since resources associated with
+ * Implicit scopes can be bound to other scopes too, but it is often unnecessary: since resources associated with
  * an implicit scope will only be released when the scope becomes <a href="../../../java/lang/ref/package.html#reachability">unreachable</a>,
  * clients can use e.g. {@link java.lang.ref.Reference#reachabilityFence(Object)} to make sure that resources associated
  * with implicit scopes are not released prematurely. That said, the above code snippet works (trivially) for implicit scopes too.
@@ -198,12 +195,14 @@ public interface ResourceScope extends AutoCloseable {
     void addCloseAction(Runnable runnable);
 
     /**
-     * Make the lifecycle of this resource scope dependent on that of the specified scope. This means that this
+     * Bind the lifecycle of this resource scope dependent to that of the specified scope. This means that this
      * scope cannot be {@link #close() closed} before the specified scope is.
-     * @param scope
+     * @param scope the resource scope this scope should be bound to.
      * @throws IllegalArgumentException if the provided scope is the same as this scope.
+     * @throws IllegalStateException if the provided scope is the same as this scope, or if this scope has already been closed,
+     * or if the provided scope has already been closed.
      */
-    void keep(ResourceScope scope);
+    void bindTo(ResourceScope scope);
 
     /**
      * Create a new confined scope. The resulting scope is closeable, and is not managed by a {@link Cleaner}.
