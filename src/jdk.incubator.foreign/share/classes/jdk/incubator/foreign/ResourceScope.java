@@ -198,35 +198,12 @@ public interface ResourceScope extends AutoCloseable {
     void addCloseAction(Runnable runnable);
 
     /**
-     * If this resource scope is explicit, this method acquires a new resource scope handle, associated with this
-     * resource scope; an explicit resource scope cannot be {@link #close() closed}
-     * until all the resource scope handles acquired from it have been {@link #release(Handle)} released}.
-     * @return a resource scope handle.
+     * Make the lifecycle of this resource scope dependent on that of the specified scope. This means that this
+     * scope cannot be {@link #close() closed} before the specified scope is.
+     * @param scope
+     * @throws IllegalArgumentException if the provided scope is the same as this scope.
      */
-    Handle acquire();
-
-    /**
-     * Release the provided resource scope handle. This method is idempotent, that is, releasing the same handle
-     * multiple times has no effect.
-     * @param handle the resource scope handle to be released.
-     * @throws IllegalArgumentException if the provided handle is not associated with this scope.
-     */
-    void release(Handle handle);
-
-    /**
-     * An abstraction modelling a resource scope handle. A resource scope handle is typically {@link #acquire() acquired} by clients
-     * in order to prevent an explicit resource scope from being closed while executing a certain operation.
-     * Once obtained, resource scope handles can be {@link #release(Handle)} released}; an explicit resource scope can
-     * be closed only <em>after</em> all the resource scope handles acquired from it have been released.
-     */
-    interface Handle {
-
-        /**
-         * Returns the resource scope associated with this handle.
-         * @return the resource scope associated with this handle.
-         */
-        ResourceScope scope();
-    }
+    void keep(ResourceScope scope);
 
     /**
      * Create a new confined scope. The resulting scope is closeable, and is not managed by a {@link Cleaner}.

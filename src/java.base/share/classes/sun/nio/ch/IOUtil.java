@@ -27,8 +27,10 @@ package sun.nio.ch;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.lang.ref.Reference;
 import java.nio.ByteBuffer;
 import java.util.Objects;
+
 import jdk.internal.access.JavaNioAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.ScopedMemoryAccess.Scope;
@@ -124,15 +126,13 @@ public class IOUtil {
         int written = 0;
         if (rem == 0)
             return 0;
-        var handle = acquireScope(bb, async);
-        try {
+        try (var scope = Scope.newConfinedScope()) {
+            keepScope(bb, async, scope);
             if (position != -1) {
                 written = nd.pwrite(fd, bufferAddress(bb) + pos, rem, position);
             } else {
                 written = nd.write(fd, bufferAddress(bb) + pos, rem);
             }
-        } finally {
-            releaseScope(handle);
         }
         if (written > 0)
             bb.position(pos + written);
@@ -170,16 +170,13 @@ public class IOUtil {
         boolean completed = false;
         int iov_len = 0;
         Runnable handleReleasers = null;
-        try {
+        try (var scope = Scope.newConfinedScope()) {
             // Iterate over buffers to populate native iovec array.
             int count = offset + length;
             int i = offset;
             while (i < count && iov_len < IOV_MAX) {
                 ByteBuffer buf = bufs[i];
-                var h = acquireScope(buf, async);
-                if (h != null) {
-                    handleReleasers = LinkedRunnable.of(Releaser.of(h), handleReleasers);
-                }
+                keepScope(buf, async, scope);
                 int pos = buf.position();
                 int lim = buf.limit();
                 assert (pos <= lim);
@@ -238,7 +235,6 @@ public class IOUtil {
             return bytesWritten;
 
         } finally {
-            releaseScopes(handleReleasers);
             // if an error occurred then clear refs to buffers and return any shadow
             // buffers to cache
             if (!completed) {
@@ -322,15 +318,13 @@ public class IOUtil {
         if (rem == 0)
             return 0;
         int n = 0;
-        var handle = acquireScope(bb, async);
-        try {
+        try (var scope = Scope.newConfinedScope()) {
+            keepScope(bb, async, scope);
             if (position != -1) {
                 n = nd.pread(fd, bufferAddress(bb) + pos, rem, position);
             } else {
                 n = nd.read(fd, bufferAddress(bb) + pos, rem);
             }
-        } finally {
-            releaseScope(handle);
         }
         if (n > 0)
             bb.position(pos + n);
@@ -375,8 +369,7 @@ public class IOUtil {
 
         boolean completed = false;
         int iov_len = 0;
-        Runnable handleReleasers = null;
-        try {
+        try (var scope = Scope.newConfinedScope()) {
             // Iterate over buffers to populate native iovec array.
             int count = offset + length;
             int i = offset;
@@ -384,10 +377,7 @@ public class IOUtil {
                 ByteBuffer buf = bufs[i];
                 if (buf.isReadOnly())
                     throw new IllegalArgumentException("Read-only buffer");
-                var h = acquireScope(buf, async);
-                if (h != null) {
-                    handleReleasers = LinkedRunnable.of(Releaser.of(h), handleReleasers);
-                }
+                keepScope(buf, async, scope);
                 int pos = buf.position();
                 int lim = buf.limit();
                 assert (pos <= lim);
@@ -449,7 +439,6 @@ public class IOUtil {
             return bytesRead;
 
         } finally {
-            releaseScopes(handleReleasers);
             // if an error occurred then clear refs to buffers and return any shadow
             // buffers to cache
             if (!completed) {
@@ -465,74 +454,13 @@ public class IOUtil {
 
     private static final JavaNioAccess NIO_ACCESS = SharedSecrets.getJavaNioAccess();
 
-    static Scope.Handle acquireScope(ByteBuffer bb, boolean async) {
-        return NIO_ACCESS.acquireScope(bb, async);
+    static void keepScope(ByteBuffer bb, boolean async, Scope opScope) {
+        NIO_ACCESS.keep(bb, async, opScope);
     }
 
-    private static void releaseScope(Scope.Handle handle) {
-        if (handle == null)
-            return;
-        try {
-            handle.scope().release(handle);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    static Runnable acquireScopes(ByteBuffer[] buffers) {
-        return acquireScopes(null, buffers);
-    }
-
-    static Runnable acquireScopes(ByteBuffer buf, ByteBuffer[] buffers) {
-        if (buffers == null) {
-            assert buf != null;
-            return IOUtil.Releaser.ofNullable(IOUtil.acquireScope(buf, true));
-        } else {
-            assert buf == null;
-            Runnable handleReleasers = null;
-            for (var b : buffers) {
-                var h = IOUtil.acquireScope(b, true);
-                if (h != null) {
-                    handleReleasers = IOUtil.LinkedRunnable.of(IOUtil.Releaser.of(h), handleReleasers);
-                }
-            }
-            return handleReleasers;
-        }
-    }
-
-    static void releaseScopes(Runnable releasers) {
-        if (releasers != null)
-            releasers.run();
-    }
-
-    static record LinkedRunnable(Runnable node, Runnable next)
-        implements Runnable
-    {
-        LinkedRunnable {
-            Objects.requireNonNull(node);
-        }
-        @Override
-        public void run() {
-            try {
-                node.run();
-            } finally {
-                if (next != null)
-                    next.run();
-            }
-        }
-        static LinkedRunnable of(Runnable first, Runnable second) {
-            return new LinkedRunnable(first, second);
-        }
-    }
-
-    static record Releaser(Scope.Handle handle) implements Runnable {
-        Releaser { Objects.requireNonNull(handle) ; }
-        @Override public void run() { releaseScope(handle); }
-        static Runnable of(Scope.Handle handle) { return new Releaser(handle); }
-        static Runnable ofNullable(Scope.Handle handle) {
-            if (handle == null)
-                return () -> { };
-            return new Releaser(handle);
+    static void keepScopes(ByteBuffer[] buffers, Scope opScope) {
+        for (ByteBuffer bb : buffers) {
+            keepScope(bb, true, opScope);
         }
     }
 

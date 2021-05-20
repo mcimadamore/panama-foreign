@@ -134,11 +134,9 @@ public class BulkMismatchAcquire {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public long mismatch_large_segment_acquire() {
-        var handle = mismatchSegmentLarge1.scope().acquire();
-        try {
+        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+            mismatchSegmentLarge1.scope().keep(scope);
             return mismatchSegmentLarge1.mismatch(mismatchSegmentLarge2);
-        } finally {
-            mismatchSegmentLarge1.scope().release(handle);
         }
     }
 
@@ -157,11 +155,9 @@ public class BulkMismatchAcquire {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public long mismatch_small_segment_acquire() {
-        var handle = mismatchSegmentLarge1.scope().acquire();
-        try {
+        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+            mismatchSegmentSmall1.scope().keep(scope);
             return mismatchSegmentSmall1.mismatch(mismatchSegmentSmall2);
-        } finally {
-            mismatchSegmentLarge1.scope().release(handle);
         }
     }
 

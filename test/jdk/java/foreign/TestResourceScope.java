@@ -163,22 +163,22 @@ public class TestResourceScope {
         ResourceScope scope = cleaner != null ?
                 ResourceScope.newConfinedScope(cleaner) :
                 ResourceScope.newConfinedScope();
-        List<ResourceScope.Handle> handles = new ArrayList<>();
+        List<ResourceScope> opScopes = new ArrayList<>();
         for (int i = 0 ; i < N_THREADS ; i++) {
-            handles.add(scope.acquire());
+            ResourceScope opScope = ResourceScope.newConfinedScope();
+            scope.keep(opScope);
+            opScopes.add(opScope);
         }
 
         while (true) {
             try {
                 scope.close();
-                assertEquals(handles.size(), 0);
+                assertEquals(opScopes.size(), 0);
                 break;
             } catch (IllegalStateException ex) {
-                assertTrue(handles.size() > 0);
-                ResourceScope.Handle handle = handles.remove(0);
-                scope.release(handle);
-                scope.release(handle); // make sure it's idempotent
-                scope.release(handle); // make sure it's idempotent
+                assertTrue(opScopes.size() > 0);
+                ResourceScope opScope = opScopes.remove(0);
+                opScope.close();
             }
         }
     }
@@ -193,12 +193,9 @@ public class TestResourceScope {
         for (int i = 0 ; i < N_THREADS ; i++) {
             new Thread(() -> {
                 lockCount.incrementAndGet();
-                try {
-                    ResourceScope.Handle handle = scope.acquire();
+                try (ResourceScope opScope = ResourceScope.newConfinedScope()) {
+                    scope.keep(opScope);
                     waitSomeTime();
-                    scope.release(handle);
-                    scope.release(handle); // make sure it's idempotent
-                    scope.release(handle); // make sure it's idempotent
                 } catch (IllegalStateException ex) {
                     // might be already closed - do nothing
                 } finally {
@@ -228,30 +225,6 @@ public class TestResourceScope {
         ResourceScope.newSharedScope().close();
     }
 
-    @Test
-    public void testCloseConfinedLock() {
-        ResourceScope scope = ResourceScope.newConfinedScope();
-        ResourceScope.Handle handle = scope.acquire();
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        Thread t = new Thread(() -> {
-            try {
-                scope.release(handle);
-                scope.release(handle); // make sure it's idempotent
-                scope.release(handle); // make sure it's idempotent
-            } catch (Throwable ex) {
-                failure.set(ex);
-            }
-        });
-        t.start();
-        try {
-            t.join();
-            assertNotNull(failure.get());
-            assertEquals(failure.get().getClass(), IllegalStateException.class);
-        } catch (Throwable ex) {
-            throw new AssertionError(ex);
-        }
-    }
-
     @Test(dataProvider = "scopes")
     public void testScopeHandles(Supplier<ResourceScope> scopeFactory) {
         ResourceScope scope = scopeFactory.get();
@@ -262,18 +235,16 @@ public class TestResourceScope {
     }
 
     private void acquireRecursive(ResourceScope scope, int acquireCount) {
-        ResourceScope.Handle handle = scope.acquire();
-        assertEquals(handle.scope(), scope);
-        if (acquireCount > 0) {
-            // recursive acquire
-            acquireRecursive(scope, acquireCount - 1);
+        try (ResourceScope opScope = ResourceScope.newConfinedScope()) {
+            scope.keep(opScope);
+            if (acquireCount > 0) {
+                // recursive acquire
+                acquireRecursive(scope, acquireCount - 1);
+            }
+            if (!scope.isImplicit()) {
+                assertThrows(IllegalStateException.class, scope::close);
+            }
         }
-        if (!scope.isImplicit()) {
-            assertThrows(IllegalStateException.class, scope::close);
-        }
-        scope.release(handle);
-        scope.release(handle); // make sure it's idempotent
-        scope.release(handle); // make sure it's idempotent
     }
 
     private void waitSomeTime() {

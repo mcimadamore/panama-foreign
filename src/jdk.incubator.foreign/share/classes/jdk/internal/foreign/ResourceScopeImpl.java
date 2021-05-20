@@ -51,6 +51,12 @@ import java.util.Objects;
  */
 public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAccess.Scope, SegmentAllocator {
 
+    static {
+        ScopedMemoryAccess.implicitScopeSupplier = () -> createImplicitScope();
+        ScopedMemoryAccess.sharedScopeSupplier = () -> createShared(null);
+        ScopedMemoryAccess.confinedScopeSupplier = () -> createConfined(null);
+    }
+
     final ResourceList resourceList;
 
     @Override
@@ -83,14 +89,36 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
     }
 
     void addInternal(ResourceList.ResourceCleanup resource) {
-        ResourceScope.Handle handle = acquire();
+        acquire();
         try {
             // avoid close vs. add races
             resourceList.add(resource);
         } finally {
-            release(handle);
+            release();
         }
     }
+
+    abstract void acquire();
+
+    abstract void release();
+
+    @Override
+    public final void keep(ScopedMemoryAccess.Scope scope) {
+        keep((ResourceScope)scope);
+    }
+
+    @Override
+    public final void keep(ResourceScope scope) {
+        acquire();
+        ((ResourceScopeImpl)scope).addOrCleanupIfFail(new Releaser());
+    }
+
+    class Releaser extends ResourceList.ResourceCleanup {
+        @Override
+        public void cleanup() {
+            release();
+        }
+    };
 
     protected ResourceScopeImpl(Cleaner cleaner, ResourceList resourceList) {
         this.resourceList = resourceList;
@@ -122,42 +150,6 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
      */
     public static ResourceScopeImpl createShared(Cleaner cleaner) {
         return new SharedScope(cleaner);
-    }
-
-    private final void release0(HandleImpl handle) {
-        try {
-            Objects.requireNonNull(handle);
-            if (handle.scope() != this) {
-                throw new IllegalArgumentException("Cannot release an handle acquired from another scope");
-            }
-            handle.release();
-        } finally {
-            Reference.reachabilityFence(this);
-        }
-    }
-
-    @Override
-    public final void release(ResourceScope.Handle handle) {
-        release0((HandleImpl)handle);
-    }
-
-    @Override
-    public final void release(ScopedMemoryAccess.Scope.Handle handle) {
-        release0((HandleImpl)handle);
-    }
-
-    @Override
-    public abstract HandleImpl acquire();
-
-    /**
-     * Internal interface used to implement resource scope handles.
-     */
-    interface HandleImpl extends ResourceScope.Handle, ScopedMemoryAccess.Scope.Handle {
-
-        @Override
-        ResourceScopeImpl scope();
-
-        void release();
     }
 
     /**
@@ -228,15 +220,10 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
      * In addition, non-closeable scopes feature a much simpler scheme for generating resource scope handles, where
      * the scope itself also acts as a resource scope handle and is returned by {@link #acquire()}.
      */
-    static class ImplicitScopeImpl extends SharedScope implements HandleImpl {
+    static class ImplicitScopeImpl extends SharedScope {
 
         public ImplicitScopeImpl(Cleaner cleaner) {
             super(cleaner);
-        }
-
-        @Override
-        public HandleImpl acquire() {
-            return this;
         }
 
         @Override
@@ -245,18 +232,18 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
         }
 
         @Override
+        void acquire() {
+            checkValidStateSlow();
+        }
+
+        @Override
+        void release() {
+            Reference.reachabilityFence(this);
+        }
+
+        @Override
         public void close() {
             throw new UnsupportedOperationException("Scope cannot be closed");
-        }
-
-        @Override
-        public void release() {
-            // do nothing
-        }
-
-        @Override
-        public ResourceScopeImpl scope() {
-            return this;
         }
     }
 

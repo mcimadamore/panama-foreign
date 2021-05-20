@@ -64,10 +64,14 @@ final class ConfinedScope extends ResourceScopeImpl {
     }
 
     @Override
-    public HandleImpl acquire() {
+    void acquire() {
         checkValidState();
         lockCount++;
-        return new ConfinedHandle();
+    }
+
+    @Override
+    void release() {
+        lockCount--;
     }
 
     void justClose() {
@@ -95,27 +99,6 @@ final class ConfinedScope extends ResourceScopeImpl {
                 fst = cleanup;
             } else {
                 throw new IllegalStateException("Already closed!");
-            }
-        }
-    }
-
-    /**
-     * A confined resource scope handle; no races are possible here.
-     */
-    final class ConfinedHandle implements HandleImpl {
-        boolean released = false;
-
-        @Override
-        public ResourceScopeImpl scope() {
-            return ConfinedScope.this;
-        }
-
-        @Override
-        public void release() {
-            checkValidState(); // thread check
-            if (!released) {
-                released = true;
-                lockCount--;
             }
         }
     }

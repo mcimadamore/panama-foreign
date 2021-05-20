@@ -823,15 +823,15 @@ public abstract class Buffer {
                 }
 
                 @Override
-                public Scope.Handle acquireScope(Buffer buffer, boolean async) {
+                public void keep(Buffer buffer, boolean async, Scope opScope) {
                     var scope = buffer.scope();
                     if (scope == null) {
-                        return null;
+                        return;
                     }
                     if (async && scope.ownerThread() != null) {
                         throw new IllegalStateException("Confined scope not supported");
                     }
-                    return scope.acquire();
+                    scope.keep(opScope);
                 }
 
                 @Override

@@ -25,6 +25,7 @@
 
 package sun.nio.ch;
 
+import java.lang.ref.Reference;
 import java.nio.channels.*;
 import java.nio.ByteBuffer;
 import java.net.*;
@@ -32,6 +33,7 @@ import java.util.concurrent.*;
 import java.io.IOException;
 import java.io.FileDescriptor;
 
+import jdk.internal.misc.ScopedMemoryAccess;
 import sun.net.ConnectionResetException;
 import sun.net.NetHooks;
 import sun.net.util.SocketExceptions;
@@ -76,7 +78,7 @@ class UnixAsynchronousSocketChannelImpl
     private boolean isScatteringRead;
     private ByteBuffer readBuffer;
     private ByteBuffer[] readBuffers;
-    private Runnable readScopeHandleReleasers;
+    private ScopedMemoryAccess.Scope readScope;
     private CompletionHandler<Number,Object> readHandler;
     private Object readAttachment;
     private PendingFuture<Number,Object> readFuture;
@@ -87,7 +89,7 @@ class UnixAsynchronousSocketChannelImpl
     private boolean isGatheringWrite;
     private ByteBuffer writeBuffer;
     private ByteBuffer[] writeBuffers;
-    private Runnable writeScopeHandleReleasers;
+    private ScopedMemoryAccess.Scope writeScope;
     private CompletionHandler<Number,Object> writeHandler;
     private Object writeAttachment;
     private PendingFuture<Number,Object> writeFuture;
@@ -411,7 +413,8 @@ class UnixAsynchronousSocketChannelImpl
             this.readBuffers = null;
             this.readAttachment = null;
             this.readHandler = null;
-            IOUtil.releaseScopes(readScopeHandleReleasers);
+            this.readScope.close();
+            this.readScope = null;
 
             // allow another read to be initiated
             enableReading();
@@ -514,6 +517,7 @@ class UnixAsynchronousSocketChannelImpl
         Throwable exc = null;
         boolean pending = false;
 
+        var scope = ScopedMemoryAccess.Scope.newSharedScope();
         try {
             begin();
 
@@ -529,7 +533,12 @@ class UnixAsynchronousSocketChannelImpl
                 PendingFuture<V,A> result = null;
                 synchronized (updateLock) {
                     this.isScatteringRead = isScatteringRead;
-                    this.readScopeHandleReleasers = IOUtil.acquireScopes(dst, dsts);
+                    if (dst == null) {
+                        IOUtil.keepScopes(dsts, scope);
+                    } else {
+                        IOUtil.keepScope(dst, true, scope);
+                    }
+                    this.readScope = scope;
                     this.readBuffer = dst;
                     this.readBuffers = dsts;
                     if (handler == null) {
@@ -613,7 +622,8 @@ class UnixAsynchronousSocketChannelImpl
             this.writeBuffers = null;
             this.writeAttachment = null;
             this.writeHandler = null;
-            IOUtil.releaseScopes(writeScopeHandleReleasers);
+            this.writeScope.close();
+            this.writeScope = null;
 
             // allow another write to be initiated
             enableWriting();
@@ -702,6 +712,7 @@ class UnixAsynchronousSocketChannelImpl
         Throwable exc = null;
         boolean pending = false;
 
+        var scope = ScopedMemoryAccess.Scope.newSharedScope();
         try {
             begin();
 
@@ -717,7 +728,12 @@ class UnixAsynchronousSocketChannelImpl
                 PendingFuture<V,A> result = null;
                 synchronized (updateLock) {
                     this.isGatheringWrite = isGatheringWrite;
-                    this.writeScopeHandleReleasers = IOUtil.acquireScopes(src, srcs);
+                    if (src == null) {
+                        IOUtil.keepScopes(srcs, scope);
+                    } else {
+                        IOUtil.keepScope(src, true, scope);
+                    }
+                    this.writeScope = scope;
                     this.writeBuffer = src;
                     this.writeBuffers = srcs;
                     if (handler == null) {

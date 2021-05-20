@@ -30,7 +30,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.ref.Reference;
+import java.lang.reflect.Method;
 import java.io.FileDescriptor;
+import java.util.function.Supplier;
 
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.util.ArraysSupport;
@@ -96,11 +98,7 @@ public class ScopedMemoryAccess {
      * Scope interface used during scoped memory access operations. A scope can be thought of as an object
      * which embodies the temporal checks associated with a given memory region.
      */
-    public interface Scope {
-
-       interface Handle {
-            Scope scope();
-        }
+    public interface Scope extends AutoCloseable {
 
         void checkValidState();
 
@@ -108,9 +106,21 @@ public class ScopedMemoryAccess {
 
         boolean isImplicit();
 
-        Handle acquire();
+        void close();
 
-        void release(Handle handle);
+        void keep(Scope scope);
+
+        static Scope newConfinedScope() {
+            return confinedScopeSupplier.get();
+        }
+
+        static Scope newSharedScope() {
+            return sharedScopeSupplier.get();
+        }
+
+        static Scope newImplicitScope() {
+            return implicitScopeSupplier.get();
+        }
 
         /**
          * Error thrown when memory access fails because the memory has already been released.
@@ -128,6 +138,38 @@ public class ScopedMemoryAccess {
             public static final ScopedAccessError INSTANCE = new ScopedAccessError();
         }
     }
+
+    public static Supplier<Scope> confinedScopeSupplier, sharedScopeSupplier, implicitScopeSupplier;
+
+    static {
+    confinedScopeSupplier = sharedScopeSupplier = implicitScopeSupplier = new Supplier<Scope>() {
+        public Scope get() { return new Scope() {
+                                        @Override
+                                        public void checkValidState() {
+
+                                        }
+
+                                        @Override
+                                        public void close() {
+
+                                        }
+
+                                        @Override
+                                        public Thread ownerThread() {
+                                            return null;
+                                        }
+
+                                        @Override
+                                        public boolean isImplicit() {
+                                            return false;
+                                        }
+
+                                        @Override
+                                        public void keep(Scope scope) {
+
+                                        }
+                                    }; } };
+                                    }
 
     @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
     @Retention(RetentionPolicy.RUNTIME)
