@@ -45,14 +45,15 @@ public class NativeTestHelper {
 
     public static class NativeScope implements SegmentAllocator, AutoCloseable {
         final ResourceScope resourceScope;
-        final ResourceScope.Handle scopeHandle;
+        final ResourceScope internalScope;
         final SegmentAllocator allocator;
 
         long allocatedBytes = 0;
 
         public NativeScope() {
             this.resourceScope = ResourceScope.newConfinedScope();
-            this.scopeHandle = resourceScope.acquire();
+            this.internalScope = ResourceScope.newConfinedScope();
+            resourceScope.keep(internalScope);
             this.allocator = SegmentAllocator.arenaAllocator(resourceScope);
         }
 
@@ -72,7 +73,7 @@ public class NativeTestHelper {
 
         @Override
         public void close() {
-            resourceScope.release(scopeHandle);
+            internalScope.close();
             resourceScope.close();
         }
     }

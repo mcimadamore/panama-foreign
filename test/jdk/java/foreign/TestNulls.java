@@ -159,7 +159,6 @@ public class TestNulls {
         addDefaultMapping(ResourceScope.class, ResourceScope.newImplicitScope());
         addDefaultMapping(SegmentAllocator.class, (size, align) -> null);
         addDefaultMapping(Supplier.class, () -> null);
-        addDefaultMapping(ResourceScope.Handle.class, ResourceScope.globalScope().acquire());
         addDefaultMapping(ClassLoader.class, TestNulls.class.getClassLoader());
         addDefaultMapping(SymbolLookup.class, CLinker.systemLookup());
     }
