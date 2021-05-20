@@ -64,6 +64,11 @@ final class ConfinedScope extends ResourceScopeImpl {
     }
 
     @Override
+    void setMemory() {
+        // do nothing
+    }
+
+    @Override
     void acquire() {
         checkValidState();
         lockCount++;

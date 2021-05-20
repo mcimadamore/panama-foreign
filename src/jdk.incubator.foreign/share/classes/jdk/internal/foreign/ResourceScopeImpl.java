@@ -94,9 +94,14 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
             // avoid close vs. add races
             resourceList.add(resource);
         } finally {
+            if (resource.hasMemory()) {
+                setMemory();
+            }
             release();
         }
     }
+
+    abstract void setMemory();
 
     abstract void acquire();
 
@@ -299,6 +304,10 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
             ResourceCleanup next;
 
             public abstract void cleanup();
+
+            public boolean hasMemory() {
+                return false;
+            }
 
             static final ResourceCleanup CLOSED_LIST = new ResourceCleanup() {
                 @Override

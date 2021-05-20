@@ -131,6 +131,11 @@ public class MappedMemorySegmentImpl extends NativeMemorySegmentImpl {
                     public void cleanup() {
                         unmapperProxy.unmap();
                     }
+
+                    @Override
+                    public boolean hasMemory() {
+                        return true;
+                    }
                 });
                 return segment;
             } else {

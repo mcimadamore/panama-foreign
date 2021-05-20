@@ -115,6 +115,11 @@ public class NativeMemorySegmentImpl extends AbstractMemorySegmentImpl {
                 unsafe.freeMemory(buf);
                 nioAccess.unreserveMemory(alignedSize, bytesSize);
             }
+
+            @Override
+            public boolean hasMemory() {
+                return true;
+            }
         });
         if (alignedSize != bytesSize) {
             long delta = alignedBuf - buf;

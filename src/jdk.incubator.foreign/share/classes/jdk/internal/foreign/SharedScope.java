@@ -53,6 +53,8 @@ class SharedScope extends ResourceScopeImpl {
 
     private static final VarHandle STATE;
 
+    private volatile boolean hasMemory;
+
     static {
         try {
             STATE = MethodHandles.lookup().findVarHandle(jdk.internal.foreign.SharedScope.class, "state", int.class);
@@ -75,6 +77,11 @@ class SharedScope extends ResourceScopeImpl {
         if (state < ALIVE) {
             throw ScopedAccessError.INSTANCE;
         }
+    }
+
+    @Override
+    void setMemory() {
+        hasMemory = true;
     }
 
     @Override
@@ -111,7 +118,9 @@ class SharedScope extends ResourceScopeImpl {
         } else if (prevState != ALIVE) {
             throw new IllegalStateException("Scope is acquired by " + prevState + " locks");
         }
-        boolean success = SCOPED_MEMORY_ACCESS.closeScope(this);
+        // avoid synchronization costs if there's no memory segment attached to this scope
+        boolean success = !hasMemory ||
+                SCOPED_MEMORY_ACCESS.closeScope(this);
         STATE.setVolatile(this, success ? CLOSED : ALIVE);
         if (!success) {
             throw new IllegalStateException("Cannot close while another thread is accessing the segment");
