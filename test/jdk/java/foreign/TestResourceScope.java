@@ -48,114 +48,114 @@ public class TestResourceScope {
 
     final static int N_THREADS = 10000;
 
-    @Test(dataProvider = "cleaners")
-    public void testConfined(Supplier<Cleaner> cleanerSupplier) {
-        AtomicInteger acc = new AtomicInteger();
-        Cleaner cleaner = cleanerSupplier.get();
-        ResourceScope scope = cleaner != null ?
-                ResourceScope.newConfinedScope(cleaner) :
-                ResourceScope.newConfinedScope();
-        for (int i = 0 ; i < N_THREADS ; i++) {
-            int delta = i;
-            scope.addCloseAction(() -> acc.addAndGet(delta));
-        }
-        assertEquals(acc.get(), 0);
-
-        if (cleaner == null) {
-            scope.close();
-            assertEquals(acc.get(), IntStream.range(0, N_THREADS).sum());
-        } else {
-            scope = null;
-            int expected = IntStream.range(0, N_THREADS).sum();
-            while (acc.get() != expected) {
-                kickGC();
-            }
-        }
-    }
-
-    @Test(dataProvider = "cleaners")
-    public void testSharedSingleThread(Supplier<Cleaner> cleanerSupplier) {
-        AtomicInteger acc = new AtomicInteger();
-        Cleaner cleaner = cleanerSupplier.get();
-        ResourceScope scope = cleaner != null ?
-                ResourceScope.newSharedScope(cleaner) :
-                ResourceScope.newSharedScope();
-        for (int i = 0 ; i < N_THREADS ; i++) {
-            int delta = i;
-            scope.addCloseAction(() -> acc.addAndGet(delta));
-        }
-        assertEquals(acc.get(), 0);
-
-        if (cleaner == null) {
-            scope.close();
-            assertEquals(acc.get(), IntStream.range(0, N_THREADS).sum());
-        } else {
-            scope = null;
-            int expected = IntStream.range(0, N_THREADS).sum();
-            while (acc.get() != expected) {
-                kickGC();
-            }
-        }
-    }
-
-    @Test(dataProvider = "cleaners")
-    public void testSharedMultiThread(Supplier<Cleaner> cleanerSupplier) {
-        AtomicInteger acc = new AtomicInteger();
-        Cleaner cleaner = cleanerSupplier.get();
-        List<Thread> threads = new ArrayList<>();
-        ResourceScope scope = cleaner != null ?
-                ResourceScope.newSharedScope(cleaner) :
-                ResourceScope.newSharedScope();
-        AtomicReference<ResourceScope> scopeRef = new AtomicReference<>(scope);
-        for (int i = 0 ; i < N_THREADS ; i++) {
-            int delta = i;
-            Thread thread = new Thread(() -> {
-                try {
-                    scopeRef.get().addCloseAction(() -> {
-                        acc.addAndGet(delta);
-                    });
-                } catch (IllegalStateException ex) {
-                    // already closed - we need to call cleanup manually
-                    acc.addAndGet(delta);
-                }
-            });
-            threads.add(thread);
-        }
-        assertEquals(acc.get(), 0);
-        threads.forEach(Thread::start);
-
-        // if no cleaner, close - not all segments might have been added to the scope!
-        // if cleaner, don't unset the scope - after all, the scope is kept alive by threads
-        if (cleaner == null) {
-            while (true) {
-                try {
-                    scope.close();
-                    break;
-                } catch (IllegalStateException ise) {
-                    // scope is acquired (by add) - wait some more
-                }
-            }
-        }
-
-        threads.forEach(t -> {
-            try {
-                t.join();
-            } catch (InterruptedException ex) {
-                fail();
-            }
-        });
-
-        if (cleaner == null) {
-            assertEquals(acc.get(), IntStream.range(0, N_THREADS).sum());
-        } else {
-            scope = null;
-            scopeRef.set(null);
-            int expected = IntStream.range(0, N_THREADS).sum();
-            while (acc.get() != expected) {
-                kickGC();
-            }
-        }
-    }
+//    @Test(dataProvider = "cleaners")
+//    public void testConfined(Supplier<Cleaner> cleanerSupplier) {
+//        AtomicInteger acc = new AtomicInteger();
+//        Cleaner cleaner = cleanerSupplier.get();
+//        ResourceScope scope = cleaner != null ?
+//                ResourceScope.newConfinedScope(cleaner) :
+//                ResourceScope.newConfinedScope();
+//        for (int i = 0 ; i < N_THREADS ; i++) {
+//            int delta = i;
+//            scope.addCloseAction(() -> acc.addAndGet(delta));
+//        }
+//        assertEquals(acc.get(), 0);
+//
+//        if (cleaner == null) {
+//            scope.close();
+//            assertEquals(acc.get(), IntStream.range(0, N_THREADS).sum());
+//        } else {
+//            scope = null;
+//            int expected = IntStream.range(0, N_THREADS).sum();
+//            while (acc.get() != expected) {
+//                kickGC();
+//            }
+//        }
+//    }
+//
+//    @Test(dataProvider = "cleaners")
+//    public void testSharedSingleThread(Supplier<Cleaner> cleanerSupplier) {
+//        AtomicInteger acc = new AtomicInteger();
+//        Cleaner cleaner = cleanerSupplier.get();
+//        ResourceScope scope = cleaner != null ?
+//                ResourceScope.newSharedScope(cleaner) :
+//                ResourceScope.newSharedScope();
+//        for (int i = 0 ; i < N_THREADS ; i++) {
+//            int delta = i;
+//            scope.addCloseAction(() -> acc.addAndGet(delta));
+//        }
+//        assertEquals(acc.get(), 0);
+//
+//        if (cleaner == null) {
+//            scope.close();
+//            assertEquals(acc.get(), IntStream.range(0, N_THREADS).sum());
+//        } else {
+//            scope = null;
+//            int expected = IntStream.range(0, N_THREADS).sum();
+//            while (acc.get() != expected) {
+//                kickGC();
+//            }
+//        }
+//    }
+//
+//    @Test(dataProvider = "cleaners")
+//    public void testSharedMultiThread(Supplier<Cleaner> cleanerSupplier) {
+//        AtomicInteger acc = new AtomicInteger();
+//        Cleaner cleaner = cleanerSupplier.get();
+//        List<Thread> threads = new ArrayList<>();
+//        ResourceScope scope = cleaner != null ?
+//                ResourceScope.newSharedScope(cleaner) :
+//                ResourceScope.newSharedScope();
+//        AtomicReference<ResourceScope> scopeRef = new AtomicReference<>(scope);
+//        for (int i = 0 ; i < N_THREADS ; i++) {
+//            int delta = i;
+//            Thread thread = new Thread(() -> {
+//                try {
+//                    scopeRef.get().addCloseAction(() -> {
+//                        acc.addAndGet(delta);
+//                    });
+//                } catch (IllegalStateException ex) {
+//                    // already closed - we need to call cleanup manually
+//                    acc.addAndGet(delta);
+//                }
+//            });
+//            threads.add(thread);
+//        }
+//        assertEquals(acc.get(), 0);
+//        threads.forEach(Thread::start);
+//
+//        // if no cleaner, close - not all segments might have been added to the scope!
+//        // if cleaner, don't unset the scope - after all, the scope is kept alive by threads
+//        if (cleaner == null) {
+//            while (true) {
+//                try {
+//                    scope.close();
+//                    break;
+//                } catch (IllegalStateException ise) {
+//                    // scope is acquired (by add) - wait some more
+//                }
+//            }
+//        }
+//
+//        threads.forEach(t -> {
+//            try {
+//                t.join();
+//            } catch (InterruptedException ex) {
+//                fail();
+//            }
+//        });
+//
+//        if (cleaner == null) {
+//            assertEquals(acc.get(), IntStream.range(0, N_THREADS).sum());
+//        } else {
+//            scope = null;
+//            scopeRef.set(null);
+//            int expected = IntStream.range(0, N_THREADS).sum();
+//            while (acc.get() != expected) {
+//                kickGC();
+//            }
+//        }
+//    }
 
     @Test(dataProvider = "cleaners")
     public void testLockSingleThread(Supplier<Cleaner> cleanerSupplier) {
@@ -183,37 +183,37 @@ public class TestResourceScope {
         }
     }
 
-    @Test(dataProvider = "cleaners")
-    public void testLockSharedMultiThread(Supplier<Cleaner> cleanerSupplier) {
-        Cleaner cleaner = cleanerSupplier.get();
-        ResourceScope scope = cleaner != null ?
-                ResourceScope.newSharedScope(cleaner) :
-                ResourceScope.newSharedScope();
-        AtomicInteger lockCount = new AtomicInteger();
-        for (int i = 0 ; i < N_THREADS ; i++) {
-            new Thread(() -> {
-                lockCount.incrementAndGet();
-                try (ResourceScope opScope = ResourceScope.newConfinedScope()) {
-                    scope.bindTo(opScope);
-                    waitSomeTime();
-                } catch (IllegalStateException ex) {
-                    // might be already closed - do nothing
-                } finally {
-                    lockCount.decrementAndGet();
-                }
-            }).start();
-        }
-
-        while (lockCount.get() > 0) {
-            try {
-                scope.close();
-                assertEquals(lockCount.get(), 0);
-                break;
-            } catch (IllegalStateException ex) {
-                waitSomeTime();
-            }
-        }
-    }
+//    @Test(dataProvider = "cleaners")
+//    public void testLockSharedMultiThread(Supplier<Cleaner> cleanerSupplier) {
+//        Cleaner cleaner = cleanerSupplier.get();
+//        ResourceScope scope = cleaner != null ?
+//                ResourceScope.newSharedScope(cleaner) :
+//                ResourceScope.newSharedScope();
+//        AtomicInteger lockCount = new AtomicInteger();
+//        for (int i = 0 ; i < N_THREADS ; i++) {
+//            new Thread(() -> {
+//                lockCount.incrementAndGet();
+//                try (ResourceScope opScope = ResourceScope.newConfinedScope()) {
+//                    scope.bindTo(opScope);
+//                    waitSomeTime();
+//                } catch (IllegalStateException ex) {
+//                    // might be already closed - do nothing
+//                } finally {
+//                    lockCount.decrementAndGet();
+//                }
+//            }).start();
+//        }
+//
+//        while (lockCount.get() > 0) {
+//            try {
+//                scope.close();
+//                assertEquals(lockCount.get(), 0);
+//                break;
+//            } catch (IllegalStateException ex) {
+//                waitSomeTime();
+//            }
+//        }
+//    }
 
     @Test
     public void testCloseEmptyConfinedScope() {

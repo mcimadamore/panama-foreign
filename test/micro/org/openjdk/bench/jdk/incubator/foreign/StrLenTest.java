@@ -30,6 +30,7 @@ import jdk.incubator.foreign.FunctionDescriptor;
 import jdk.incubator.foreign.MemoryAccess;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemorySegment;
+import jdk.incubator.foreign.MemorySegmentPool;
 import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.SegmentAllocator;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -62,6 +63,8 @@ public class StrLenTest {
 
     SegmentAllocator segmentAllocator;
     SegmentAllocator arenaAllocator = SegmentAllocator.arenaAllocator(scope);
+
+    MemorySegmentPool memorySegmentPool = new MemorySegmentPool(ResourceScope.globalScope(), false);
 
     @Param({"5", "20", "100"})
     public int size;
@@ -142,6 +145,32 @@ public class StrLenTest {
         FREE_TRIVIAL.invokeExact(address);
         return res;
     }
+
+    @Benchmark
+    public int panama_strlen_memsegmentpool_allocator_copy() throws Throwable {
+        try(ResourceScope scope = ResourceScope.newConfinedScope()) {
+            final var allocator = memorySegmentPool.allocatorForScope(scope);
+
+            byte[] bytes = str.getBytes();
+            int len = bytes.length;
+
+            final var segment = allocator.allocate(len+1);
+            segment.copyFrom(MemorySegment.ofArray(bytes));
+            MemoryAccess.setByteAtOffset(segment, len, (byte)0);
+
+            return (int)STRLEN.invokeExact(segment.address());
+        }
+    }
+
+    @Benchmark
+    public int panama_strlen_memsegmentpool_allocator() throws Throwable {
+        ResourceScope scope = ResourceScope.newConfinedScope();
+        final var allocator = memorySegmentPool.allocatorForScope(scope);
+        int len = (int)STRLEN.invokeExact(CLinker.toCString(str, allocator).address());
+        scope.close();
+        return len;
+    }
+
 
     static MemoryAddress makeStringUnsafe(String s) {
         byte[] bytes = s.getBytes();

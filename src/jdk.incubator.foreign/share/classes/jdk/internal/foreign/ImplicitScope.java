@@ -26,89 +26,63 @@
 package jdk.internal.foreign;
 
 import jdk.incubator.foreign.ResourceScope;
+import jdk.internal.ref.CleanerFactory;
 
-import java.lang.ref.Cleaner;
+import java.lang.ref.Reference;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class ConfinedScope extends ResourceScopeImpl implements Runnable {
+public class ImplicitScope extends ResourceScopeImpl implements Runnable {
 
-    boolean closed;
-    final Thread ownerThread;
-    int lockCount;
-    final List<Runnable> resourceList = new LinkedList<>();
+    private final ConcurrentLinkedQueue<Runnable> resourceList = new ConcurrentLinkedQueue<>();
 
-    public ConfinedScope(Thread ownerThread, Cleaner cleaner) {
-        this.ownerThread = ownerThread;
-        if (cleaner != null) {
-            List<Runnable> localList = resourceList;
-            cleaner.register(this, () -> cleanup(localList)); // non-capturing
-        }
+    public ImplicitScope() {
+        Queue<Runnable> localList = resourceList;
+        CleanerFactory.cleaner().register(this, () -> cleanup(localList));
     }
 
     @Override
     public boolean isAlive() {
-        return !closed;
+        return true;
     }
 
     @Override
     public Thread ownerThread() {
-        return ownerThread;
+        return null;
     }
 
     @Override
     public boolean isImplicit() {
-        return false;
+        return true;
     }
 
     @Override
     public void close() {
-        checkValidState();
-        if (lockCount > 0) {
-            throw new IllegalStateException("Scope is acquired by " + lockCount + " locks");
-        }
-        closed = true;
-        cleanup(resourceList);
+        throw new UnsupportedOperationException("Scope cannot be closed");
     }
 
     @Override
     public void addCloseAction(Runnable runnable) {
-        checkValidState();
         resourceList.add(runnable);
     }
 
     @Override
     public void bindTo(ResourceScope scope) {
-        checkValidState();
-        acquire();
         scope.addCloseAction(this);
     }
 
     @Override
     public void checkValidState() {
-        if (ownerThread != Thread.currentThread()) {
-            throw new IllegalStateException("Attempted access outside owning thread");
-        }
-        if (closed) {
-            throw new IllegalStateException("Already closed");
-        }
-    }
-
-    private void acquire() {
-        lockCount++;
-    }
-
-    private void release() {
-        lockCount--;
+        // do nothing
     }
 
     @Override
     public void run() {
-        release();
+        Reference.reachabilityFence(this);
     }
 
-    static void cleanup(List<Runnable> resourceList) {
+    static void cleanup(Queue<Runnable> resourceList) {
         Iterator<Runnable> it = resourceList.iterator();
         while (it.hasNext()) {
             it.next().run();

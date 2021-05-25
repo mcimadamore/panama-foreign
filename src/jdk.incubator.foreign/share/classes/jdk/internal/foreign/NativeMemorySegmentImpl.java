@@ -71,7 +71,7 @@ public class NativeMemorySegmentImpl extends AbstractMemorySegmentImpl {
     @Override
     ByteBuffer makeByteBuffer() {
         return nioAccess.newDirectByteBuffer(min(), (int) this.length, null,
-                scope == ResourceScopeImpl.GLOBAL ? null : this);
+                scope == ImplicitScope.GLOBAL ? null : this);
     }
 
     @Override
@@ -109,17 +109,9 @@ public class NativeMemorySegmentImpl extends AbstractMemorySegmentImpl {
         long alignedBuf = Utils.alignUp(buf, alignmentBytes);
         AbstractMemorySegmentImpl segment = new NativeMemorySegmentImpl(buf, alignedSize,
                 defaultAccessModes(alignedSize), scope);
-        scope.addOrCleanupIfFail(new ResourceScopeImpl.ResourceList.ResourceCleanup() {
-            @Override
-            public void cleanup() {
-                unsafe.freeMemory(buf);
-                nioAccess.unreserveMemory(alignedSize, bytesSize);
-            }
-
-            @Override
-            public boolean hasMemory() {
-                return true;
-            }
+        scope.addOrCleanupIfFail(() -> {
+            unsafe.freeMemory(buf);
+            nioAccess.unreserveMemory(alignedSize, bytesSize);
         });
         if (alignedSize != bytesSize) {
             long delta = alignedBuf - buf;

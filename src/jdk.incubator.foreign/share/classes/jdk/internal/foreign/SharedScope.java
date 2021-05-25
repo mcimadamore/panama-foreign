@@ -25,22 +25,17 @@
 
 package jdk.internal.foreign;
 
+import jdk.incubator.foreign.ResourceScope;
 import jdk.internal.misc.ScopedMemoryAccess;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.lang.ref.Cleaner;
+import java.util.Iterator;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-/**
- * A shared scope, which can be shared across multiple threads. Closing a shared scope has to ensure that
- * (i) only one thread can successfully close a scope (e.g. in a close vs. close race) and that
- * (ii) no other thread is accessing the memory associated with this scope while the segment is being
- * closed. To ensure the former condition, a CAS is performed on the liveness bit. Ensuring the latter
- * is trickier, and require a complex synchronization protocol (see {@link jdk.internal.misc.ScopedMemoryAccess}).
- * Since it is the responsibility of the closing thread to make sure that no concurrent access is possible,
- * checking the liveness bit upon access can be performed in plain mode, as in the confined case.
- */
-class SharedScope extends ResourceScopeImpl {
+public class SharedScope extends ResourceScopeImpl implements Runnable {
 
     private static final ScopedMemoryAccess SCOPED_MEMORY_ACCESS = ScopedMemoryAccess.getScopedMemoryAccess();
 
@@ -50,21 +45,28 @@ class SharedScope extends ResourceScopeImpl {
     private static final int MAX_FORKS = Integer.MAX_VALUE;
 
     private int state = ALIVE;
+    private final ConcurrentLinkedQueue<Runnable> resourceList = new ConcurrentLinkedQueue<>();
 
     private static final VarHandle STATE;
 
-    private volatile boolean hasMemory;
-
     static {
         try {
-            STATE = MethodHandles.lookup().findVarHandle(jdk.internal.foreign.SharedScope.class, "state", int.class);
+            STATE = MethodHandles.lookup().findVarHandle(SharedScope.class, "state", int.class);
         } catch (Throwable ex) {
             throw new ExceptionInInitializerError(ex);
         }
     }
 
-    SharedScope(Cleaner cleaner) {
-        super(cleaner, new SharedResourceList());
+    public SharedScope(Cleaner cleaner) {
+        if (cleaner != null) {
+            Queue<Runnable> localList = resourceList;
+            cleaner.register(this, () -> cleanup(localList));
+        }
+    }
+
+    @Override
+    public boolean isAlive() {
+        return (int) STATE.getVolatile(this) != CLOSED;
     }
 
     @Override
@@ -73,19 +75,48 @@ class SharedScope extends ResourceScopeImpl {
     }
 
     @Override
+    public boolean isImplicit() {
+        return false;
+    }
+
+    @Override
+    public void close() {
+        int prevState = (int) STATE.compareAndExchange(this, ALIVE, CLOSING);
+        if (prevState < 0) {
+            throw new IllegalStateException("Already closed");
+        } else if (prevState != ALIVE) {
+            throw new IllegalStateException("Scope is acquired by " + prevState + " locks");
+        }
+        // avoid synchronization costs if there's no memory segment attached to this scope
+        boolean success = SCOPED_MEMORY_ACCESS.closeScope(this);
+        STATE.setVolatile(this, success ? CLOSED : ALIVE);
+        if (!success) {
+            throw new IllegalStateException("Cannot close while another thread is accessing the segment");
+        }
+        cleanup(resourceList);
+    }
+
+    @Override
+    public void addCloseAction(Runnable runnable) {
+        acquire();
+        resourceList.add(runnable);
+        release();
+    }
+
+    @Override
+    public void bindTo(ResourceScope scope) {
+        acquire();
+        scope.addCloseAction(this);
+    }
+
+    @Override
     public void checkValidState() {
         if (state < ALIVE) {
-            throw ScopedAccessError.INSTANCE;
+            throw ScopedMemoryAccess.Scope.ScopedAccessError.INSTANCE;
         }
     }
 
-    @Override
-    void setMemory() {
-        hasMemory = true;
-    }
-
-    @Override
-    void acquire() {
+    private void acquire() {
         int value;
         do {
             value = (int) STATE.getVolatile(this);
@@ -99,67 +130,27 @@ class SharedScope extends ResourceScopeImpl {
         } while (!STATE.compareAndSet(this, value, value + 1));
     }
 
-    @Override
-    void release() {
+    private void release() {
         int value;
         do {
-            value = (int) STATE.getVolatile(jdk.internal.foreign.SharedScope.this);
+            value = (int) STATE.getVolatile(this);
             if (value <= ALIVE) {
                 //cannot get here - we can't close segment twice
                 throw new IllegalStateException("Already closed");
             }
-        } while (!STATE.compareAndSet(jdk.internal.foreign.SharedScope.this, value, value - 1));
-    }
-
-    void justClose() {
-        int prevState = (int) STATE.compareAndExchange(this, ALIVE, CLOSING);
-        if (prevState < 0) {
-            throw new IllegalStateException("Already closed");
-        } else if (prevState != ALIVE) {
-            throw new IllegalStateException("Scope is acquired by " + prevState + " locks");
-        }
-        // avoid synchronization costs if there's no memory segment attached to this scope
-        boolean success = !hasMemory ||
-                SCOPED_MEMORY_ACCESS.closeScope(this);
-        STATE.setVolatile(this, success ? CLOSED : ALIVE);
-        if (!success) {
-            throw new IllegalStateException("Cannot close while another thread is accessing the segment");
-        }
+        } while (!STATE.compareAndSet(this, value, value - 1));
     }
 
     @Override
-    public boolean isAlive() {
-        return (int) STATE.getVolatile(this) != CLOSED;
+    public void run() {
+        release();
     }
 
-    /**
-     * A shared resource list; this implementation has to handle add vs. add races.
-     */
-    static class SharedResourceList extends ResourceList {
-
-        static final VarHandle FST;
-
-        static {
-            try {
-                FST = MethodHandles.lookup().findVarHandle(ResourceList.class, "fst", ResourceCleanup.class);
-            } catch (Throwable ex) {
-                throw new ExceptionInInitializerError();
-            }
-        }
-
-        @Override
-        void add(ResourceCleanup cleanup) {
-            // We don't need to worry about add vs. close races here; adding a new cleanup action is done
-            // under acquire, which prevents scope from being closed. The only possible race here is
-            // add vs. add.
-            while (true) {
-                ResourceCleanup prev = (ResourceCleanup) FST.getAcquire(this);
-                cleanup.next = prev;
-                if ((ResourceCleanup) FST.compareAndExchangeRelease(this, prev, cleanup) == prev) {
-                    return; //victory
-                }
-                // keep trying
-            }
+    static void cleanup(Queue<Runnable> resourceList) {
+        Iterator<Runnable> it = resourceList.iterator();
+        while (it.hasNext()) {
+            it.next().run();
+            it.remove();
         }
     }
 }
