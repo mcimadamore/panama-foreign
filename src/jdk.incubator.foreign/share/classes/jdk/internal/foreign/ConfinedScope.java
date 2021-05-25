@@ -28,22 +28,20 @@ package jdk.internal.foreign;
 import jdk.incubator.foreign.ResourceScope;
 
 import java.lang.ref.Cleaner;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 
 public class ConfinedScope extends ResourceScopeImpl implements Runnable {
 
     boolean closed;
     final Thread ownerThread;
     int lockCount;
-    final List<Runnable> resourceList = new LinkedList<>();
+    final ResourceList resourceList = new ResourceList();
+    ResourceList resourceListToAdd = resourceList;
 
     public ConfinedScope(Thread ownerThread, Cleaner cleaner) {
         this.ownerThread = ownerThread;
         if (cleaner != null) {
-            List<Runnable> localList = resourceList;
-            cleaner.register(this, () -> cleanup(localList)); // non-capturing
+            var localRef = resourceList;
+            cleaner.register(this, () -> localRef.cleanup()); // non-capturing
         }
     }
 
@@ -69,13 +67,13 @@ public class ConfinedScope extends ResourceScopeImpl implements Runnable {
             throw new IllegalStateException("Scope is acquired by " + lockCount + " locks");
         }
         closed = true;
-        cleanup(resourceList);
+        resourceList.cleanup();
     }
 
     @Override
     public void addCloseAction(Runnable runnable) {
         checkValidState();
-        resourceList.add(runnable);
+        resourceListToAdd = resourceListToAdd.add(runnable);
     }
 
     @Override
@@ -108,11 +106,41 @@ public class ConfinedScope extends ResourceScopeImpl implements Runnable {
         release();
     }
 
-    static void cleanup(List<Runnable> resourceList) {
-        Iterator<Runnable> it = resourceList.iterator();
-        while (it.hasNext()) {
-            it.next().run();
-            it.remove();
+    static class ResourceList {
+        Runnable r1, r2, r3, r4, r5;
+        ResourceList rest;
+        int size;
+
+        ResourceList add(Runnable r) {
+            return switch (size++) {
+                case 0 -> { r1 = r; yield this; }
+                case 1 -> { r2 = r; yield this; }
+                case 2 -> { r3 = r; yield this; }
+                case 3 -> { r4 = r; yield this; }
+                case 4 -> { r5 = r; yield this; }
+                default -> { rest().add(r); yield rest; }
+            };
+        }
+
+        ResourceList rest() {
+            if (rest == null) {
+                rest = new ResourceList();
+            }
+            return rest;
+        }
+
+        @SuppressWarnings("fallthrough")
+        void cleanup() {
+            switch (size) {
+                default: rest.cleanup();
+                case 5: r5.run();
+                case 4: r4.run();
+                case 3: r3.run();
+                case 2: r2.run();
+                case 1: r1.run();
+                case 0: break;
+            }
+            size = 0; // avoid further cleanups (e.g. by cleaner)
         }
     }
 }
