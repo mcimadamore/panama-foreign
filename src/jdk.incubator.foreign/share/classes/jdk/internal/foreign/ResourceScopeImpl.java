@@ -31,6 +31,7 @@ import jdk.incubator.foreign.SegmentAllocator;
 import jdk.internal.misc.ScopedMemoryAccess;
 
 import java.lang.ref.Cleaner;
+import java.util.Objects;
 
 public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAccess.Scope, SegmentAllocator {
 
@@ -100,6 +101,7 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
 
     @Override
     public final void addCloseAction(Runnable runnable) {
+        Objects.requireNonNull(runnable);
         addInternal(ResourceList.Node.ofRunnable(runnable), false);
     }
 

@@ -53,7 +53,6 @@ public class SharedScope extends ResourceScopeImpl {
     private int state = ALIVE;
 
     private static final VarHandle STATE;
-    private final ResourceList resourceList = new ResourceList();
     private volatile boolean needsHandshake;
 
     static {
