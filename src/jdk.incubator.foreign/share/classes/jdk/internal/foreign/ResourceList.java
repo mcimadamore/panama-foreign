@@ -32,10 +32,6 @@ public class ResourceList {
 
     static final VarHandle HEAD;
 
-    public ResourceList() {
-        System.err.println("");
-    }
-
     static {
         try {
             HEAD = MethodHandles.lookup().findVarHandle(ResourceList.class, "head", Node.class);
