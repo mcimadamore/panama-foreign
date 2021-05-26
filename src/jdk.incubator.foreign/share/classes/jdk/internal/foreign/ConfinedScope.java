@@ -47,6 +47,7 @@ final class ConfinedScope extends ResourceScopeImpl {
         super(cleaner, new ConfinedResourceList());
         this.owner = owner;
     }
+    
 
     @ForceInline
     public final void checkValidState() {
