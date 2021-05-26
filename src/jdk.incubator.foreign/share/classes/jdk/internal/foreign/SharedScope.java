@@ -52,14 +52,13 @@ public class SharedScope extends ResourceScopeImpl {
 
     private int state = ALIVE;
 
-    private static final VarHandle STATE, NEEDS_HANDSHAKE;
+    private static final VarHandle STATE;
     private final ResourceList resourceList = new ResourceList();
     private volatile boolean needsHandshake;
 
     static {
         try {
             STATE = MethodHandles.lookup().findVarHandle(SharedScope.class, "state", int.class);
-            NEEDS_HANDSHAKE = MethodHandles.lookup().findVarHandle(SharedScope.class, "needsHandshake", boolean.class);
         } catch (Throwable ex) {
             throw new ExceptionInInitializerError(ex);
         }
