@@ -109,10 +109,13 @@ public class NativeMemorySegmentImpl extends AbstractMemorySegmentImpl {
         long alignedBuf = Utils.alignUp(buf, alignmentBytes);
         AbstractMemorySegmentImpl segment = new NativeMemorySegmentImpl(buf, alignedSize,
                 defaultAccessModes(alignedSize), scope);
-        scope.addOrCleanupIfFail(() -> {
-            unsafe.freeMemory(buf);
-            nioAccess.unreserveMemory(alignedSize, bytesSize);
-        });
+        scope.addOrCleanupIfFail(new ResourceList.Node() {
+            @Override
+            public void cleanup() {
+                unsafe.freeMemory(buf);
+                nioAccess.unreserveMemory(alignedSize, bytesSize);
+            }
+        }, false);
         if (alignedSize != bytesSize) {
             long delta = alignedBuf - buf;
             segment = segment.asSlice(delta, bytesSize);

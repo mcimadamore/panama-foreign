@@ -33,13 +33,10 @@ import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class ImplicitScope extends ResourceScopeImpl implements Runnable {
-
-    private final ConcurrentLinkedQueue<Runnable> resourceList = new ConcurrentLinkedQueue<>();
+public class ImplicitScope extends ResourceScopeImpl {
 
     public ImplicitScope() {
-        Queue<Runnable> localList = resourceList;
-        CleanerFactory.cleaner().register(this, () -> cleanup(localList));
+        super(CleanerFactory.cleaner());
     }
 
     @Override
@@ -63,30 +60,22 @@ public class ImplicitScope extends ResourceScopeImpl implements Runnable {
     }
 
     @Override
-    public void addCloseAction(Runnable runnable) {
-        resourceList.add(runnable);
+    void addInternal(ResourceList.Node node, boolean isCloseDependency) {
+        resourceList.addAtomic(node);
     }
 
     @Override
     public void bindTo(ResourceScope scope) {
-        scope.addCloseAction(this);
+        ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {
+            @Override
+            public void cleanup() {
+                Reference.reachabilityFence(this);
+            }
+        }, true);
     }
 
     @Override
     public void checkValidState() {
         // do nothing
-    }
-
-    @Override
-    public void run() {
-        Reference.reachabilityFence(this);
-    }
-
-    static void cleanup(Queue<Runnable> resourceList) {
-        Iterator<Runnable> it = resourceList.iterator();
-        while (it.hasNext()) {
-            it.next().run();
-            it.remove();
-        }
     }
 }

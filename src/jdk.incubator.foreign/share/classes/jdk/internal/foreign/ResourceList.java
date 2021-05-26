@@ -25,69 +25,60 @@
 
 package jdk.internal.foreign;
 
-class ResourceList {
-    Runnable r1, r2, r3, r4, r5;
-    ResourceList rest;
-    int size;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 
-    ResourceList add(Runnable r) {
-        return switch (size++) {
-            case 0 -> {
-                r1 = r;
-                yield this;
-            }
-            case 1 -> {
-                r2 = r;
-                yield this;
-            }
-            case 2 -> {
-                r3 = r;
-                yield this;
-            }
-            case 3 -> {
-                r4 = r;
-                yield this;
-            }
-            case 4 -> {
-                r5 = r;
-                yield this;
-            }
-            default -> {
-                rest().add(r);
-                yield rest;
-            }
-        };
-    }
+public class ResourceList {
 
-    ResourceList rest() {
-        if (rest == null) {
-            rest = new ResourceList();
+    static final VarHandle HEAD;
+
+    static {
+        try {
+            HEAD = MethodHandles.lookup().findVarHandle(ResourceList.class, "head", Node.class);
+        } catch (Throwable ex) {
+            throw new ExceptionInInitializerError();
         }
-        return rest;
     }
 
-    @SuppressWarnings("fallthrough")
+    Node head;
+
+    public static abstract class Node {
+        Node rest;
+
+        public abstract void cleanup();
+
+        static Node ofRunnable(Runnable r) {
+            return new Node() {
+                @Override
+                public void cleanup() {
+                    r.run();
+                }
+            };
+        }
+    }
+
+    void addConfined(Node newNode) {
+        newNode.rest = head;
+        head = newNode;
+    }
+
+    void addAtomic(Node newNode) {
+        while (true) {
+            Node prev = (Node)HEAD.getAcquire(this);
+            newNode.rest = prev;
+            if ((Node)HEAD.compareAndExchangeRelease(this, prev, newNode) == prev) {
+                return; //victory
+            }
+            // keep trying
+        }
+    }
+
     void cleanup() {
-        // avoid recursion - might be too deep
-        ResourceList curr = this;
-        while (curr != null) {
-            switch (curr.size) {
-                default:
-                case 5:
-                    curr.r5.run();
-                case 4:
-                    curr.r4.run();
-                case 3:
-                    curr.r3.run();
-                case 2:
-                    curr.r2.run();
-                case 1:
-                    curr.r1.run();
-                case 0:
-                    break;
-            }
-            curr.size = 0; // avoid further cleanups (e.g. by cleaner)
-            curr = curr.rest;
+        var current = head;
+        while (current != null) {
+            current.cleanup();
+            current = current.rest;
         }
+        head = null;
     }
 }

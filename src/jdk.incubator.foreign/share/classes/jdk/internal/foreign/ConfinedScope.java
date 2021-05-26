@@ -29,20 +29,15 @@ import jdk.incubator.foreign.ResourceScope;
 
 import java.lang.ref.Cleaner;
 
-public class ConfinedScope extends ResourceScopeImpl implements Runnable {
+public class ConfinedScope extends ResourceScopeImpl {
 
     boolean closed;
     final Thread ownerThread;
     int lockCount;
-    final ResourceList resourceList = new ResourceList();
-    ResourceList resourceListToAdd = resourceList;
 
     public ConfinedScope(Thread ownerThread, Cleaner cleaner) {
+        super(cleaner);
         this.ownerThread = ownerThread;
-        if (cleaner != null) {
-            var localRef = resourceList;
-            cleaner.register(this, localRef::cleanup); // non-capturing
-        }
     }
 
     @Override
@@ -71,16 +66,21 @@ public class ConfinedScope extends ResourceScopeImpl implements Runnable {
     }
 
     @Override
-    public void addCloseAction(Runnable runnable) {
+    void addInternal(ResourceList.Node node, boolean isCloseDependency) {
         checkValidState();
-        resourceListToAdd = resourceListToAdd.add(runnable);
+        resourceList.addConfined(node);
     }
 
     @Override
     public void bindTo(ResourceScope scope) {
         checkValidState();
         acquire();
-        scope.addCloseAction(this);
+        ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {
+            @Override
+            public void cleanup() {
+                ConfinedScope.this.release();
+            }
+        }, true);
     }
 
     @Override
@@ -100,10 +100,4 @@ public class ConfinedScope extends ResourceScopeImpl implements Runnable {
     private void release() {
         lockCount--;
     }
-
-    @Override
-    public void run() {
-        release();
-    }
-
 }

@@ -29,19 +29,24 @@ import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.SegmentAllocator;
 import jdk.internal.misc.ScopedMemoryAccess;
-import sun.security.action.GetBooleanAction;
 
 import java.lang.ref.Cleaner;
 
 public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAccess.Scope, SegmentAllocator {
 
-    private static final boolean sharedScopeSync = GetBooleanAction.privilegedGetProperty("sharedScope.sync");
-    private static final boolean sharedScopeOld = GetBooleanAction.privilegedGetProperty("sharedScope.old");
+    final ResourceList resourceList = new ResourceList();
 
     static {
         ScopedMemoryAccess.implicitScopeSupplier = () -> createImplicitScope();
         ScopedMemoryAccess.sharedScopeSupplier = () -> createShared(null);
         ScopedMemoryAccess.confinedScopeSupplier = () -> createConfined(null);
+    }
+
+    public ResourceScopeImpl(Cleaner cleaner) {
+        if (cleaner != null) {
+            var localList = resourceList;
+            cleaner.register(this, localList::cleanup);
+        }
     }
 
     public abstract void checkValidState();
@@ -81,23 +86,28 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
      * @return a shared memory scope
      */
     public static ResourceScopeImpl createShared(Cleaner cleaner) {
-        return sharedScopeSync ?
-                new SharedScopeSync(cleaner) :
-                (sharedScopeOld ? new SharedScopeCAS(cleaner) : new SharedScope(cleaner));
+        return new SharedScope(cleaner);
     }
 
-    public void addOrCleanupIfFail(Runnable runnable) {
+    public final void addOrCleanupIfFail(ResourceList.Node node, boolean isCloseDependency) {
         try {
-            addCloseAction(runnable);
+            addInternal(node, isCloseDependency);
         } catch (IllegalStateException ex) {
-            runnable.run();
+            node.cleanup();
             throw ex;
         }
     }
 
+    @Override
+    public final void addCloseAction(Runnable runnable) {
+        addInternal(ResourceList.Node.ofRunnable(runnable), false);
+    }
+
+    abstract void addInternal(ResourceList.Node node, boolean isCloseDependency);
+
     public static ImplicitScope GLOBAL = new ImplicitScope() {
         @Override
-        public void addCloseAction(Runnable runnable) {
+        public void addInternal(ResourceList.Node runnable, boolean isCloseDependency) {
             // do nothing
         }
     };
