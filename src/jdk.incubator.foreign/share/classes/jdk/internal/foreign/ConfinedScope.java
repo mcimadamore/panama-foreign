@@ -72,7 +72,7 @@ public class ConfinedScope extends ResourceScopeImpl {
     }
 
     @Override
-    public void bindTo(ResourceScope scope) {
+    public void addCloseDependency(ResourceScope scope) {
         checkValidState();
         acquire();
         ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {

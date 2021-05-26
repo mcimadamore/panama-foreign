@@ -166,7 +166,7 @@ public class TestResourceScope {
         List<ResourceScope> opScopes = new ArrayList<>();
         for (int i = 0 ; i < N_THREADS ; i++) {
             ResourceScope opScope = ResourceScope.newConfinedScope();
-            scope.bindTo(opScope);
+            scope.addCloseDependency(opScope);
             opScopes.add(opScope);
         }
 
@@ -194,7 +194,7 @@ public class TestResourceScope {
             new Thread(() -> {
                 lockCount.incrementAndGet();
                 try (ResourceScope opScope = ResourceScope.newConfinedScope()) {
-                    scope.bindTo(opScope);
+                    scope.addCloseDependency(opScope);
                     waitSomeTime();
                 } catch (IllegalStateException ex) {
                     // might be already closed - do nothing
@@ -236,7 +236,7 @@ public class TestResourceScope {
 
     private void acquireRecursive(ResourceScope scope, int acquireCount) {
         try (ResourceScope opScope = ResourceScope.newConfinedScope()) {
-            scope.bindTo(opScope);
+            scope.addCloseDependency(opScope);
             if (acquireCount > 0) {
                 // recursive acquire
                 acquireRecursive(scope, acquireCount - 1);

@@ -62,7 +62,7 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
 
     @Override
     public void bindTo(ScopedMemoryAccess.Scope scope) {
-        bindTo((ResourceScope)scope);
+        addCloseDependency((ResourceScope)scope);
     }
 
     public static ResourceScopeImpl createImplicitScope() {

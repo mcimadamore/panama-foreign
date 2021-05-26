@@ -40,18 +40,11 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -78,7 +71,7 @@ public class TestSharedScopeContention {
     final Supplier<Void> ACQUIRE_RELEASE = () -> {
         for (int i = 0 ; i < ITERATIONS_PER_THREAD ; i++) {
             try (ResourceScope op = ResourceScope.newConfinedScope()) {
-                scope.bindTo(op);
+                scope.addCloseDependency(op);
             }
         }
         return null;

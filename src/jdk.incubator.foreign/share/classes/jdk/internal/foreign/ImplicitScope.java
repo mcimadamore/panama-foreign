@@ -65,7 +65,7 @@ public class ImplicitScope extends ResourceScopeImpl {
     }
 
     @Override
-    public void bindTo(ResourceScope scope) {
+    public void addCloseDependency(ResourceScope scope) {
         ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {
             @Override
             public void cleanup() {

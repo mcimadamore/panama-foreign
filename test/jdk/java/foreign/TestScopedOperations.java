@@ -93,7 +93,7 @@ public class TestScopedOperations {
             ScopedOperation.ofScope(scope -> scope.addCloseAction(() -> {}), "ResourceScope::addOnClose");
             ScopedOperation.ofScope(scope -> {
                 try (ResourceScope innerScope = ResourceScope.newConfinedScope()) {
-                    scope.bindTo(innerScope);
+                    scope.addCloseDependency(innerScope);
                 }
             }, "ResourceScope::lock");
             // segment operations

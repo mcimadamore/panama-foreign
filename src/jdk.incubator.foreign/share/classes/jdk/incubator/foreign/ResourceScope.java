@@ -115,11 +115,11 @@ try (ResourceScope scope = ResourceScope.newSharedScope()) {
  * should always ensure that proper synchronization mechanisms (e.g. using resource scope handles, see below) are put in place
  * so that threads closing shared resource scopes can never race against threads accessing resources managed by same scopes.
  *
- * <h2>Bound resource scopes</h2>
+ * <h2>Temporal dependencies between scopes</h2>
  *
- * Resource scopes can be made <em>non-closeable</em> by {@link #bindTo(ResourceScope)} binding) them to one or more
- * other resource scopes. A resource scope that is bound to another resource scope cannot be released (either implicitly or explicitly)
- * until <em>all</em> the resource scopes it is bound to have also been released.
+ * Resource scopes can express {@link #addCloseDependency(ResourceScope) temporal dependencies} on one or more
+ * other resource scopes, said <em>target scopes</em>. A resource scope that depends on one or more target scopes
+ * cannot be released (either implicitly or explicitly) until <em>all</em> the target scopes it is bound to have also been released.
  * <p>
  * This can be useful when clients need to perform a critical operation on a memory segment, during which they have
  * to ensure that the segment will not be released; this can be done as follows:
@@ -127,12 +127,12 @@ try (ResourceScope scope = ResourceScope.newSharedScope()) {
  * <blockquote><pre>{@code
 MemorySegment segment = ...
 try (ResourceScope criticalScope = ResourceScope.newConfinedScope()) {
-   segment.scope().bindTo(criticalScope);
+   segment.scope().addCloseDependency(criticalScope);
    <critical operation on segment>
 }
  * }</pre></blockquote>
  *
- * Implicit scopes can be bound to other scopes too, but it is often unnecessary: since resources associated with
+ * Implicit scopes can feature temporal bound dependencies too, but it is often unnecessary: since resources associated with
  * an implicit scope will only be released when the scope becomes <a href="../../../java/lang/ref/package.html#reachability">unreachable</a>,
  * clients can use e.g. {@link java.lang.ref.Reference#reachabilityFence(Object)} to make sure that resources associated
  * with implicit scopes are not released prematurely. That said, the above code snippet works (trivially) for implicit scopes too.
@@ -180,7 +180,8 @@ public interface ResourceScope extends AutoCloseable {
      *     <li>this resource scope is not <em>alive</em>
      *     <li>this resource scope is confined, and this method is called from a thread other than the thread owning this resource scope</li>
      *     <li>this resource scope is shared and a resource associated with this scope is accessed while this method is called</li>
-     *     <li>one or more handles (see {@link #acquire()}) associated with this resource scope have not been closed</li>
+     *     <li>this resource scope has one or more {@link #addCloseDependency(ResourceScope) close dependencies} whose target scopes
+     *     have not been closed</li>
      * </ul>
      * @throws UnsupportedOperationException if this resource scope is {@link #isImplicit() implicit}.
      */
@@ -195,14 +196,17 @@ public interface ResourceScope extends AutoCloseable {
     void addCloseAction(Runnable runnable);
 
     /**
-     * Bind the lifecycle of this resource scope dependent to that of the specified scope. This means that this
-     * scope cannot be {@link #close() closed} before the specified scope is.
-     * @param scope the resource scope this scope should be bound to.
-     * @throws IllegalArgumentException if the provided scope is the same as this scope.
-     * @throws IllegalStateException if the provided scope is the same as this scope, or if this scope has already been closed,
-     * or if the provided scope has already been closed.
+     * Add a close dependency on a given scope, said to be the <em>target scope</em> of the close dependency.
+     * When a resource scope {@code S1} has a close dependency on a target scope {@code S2},
+     * there exists a <em>temporal dependency</em> between these scopes, meaning that {@code S1} cannot be closed
+     * (either {@link #close() directly}, or indirectly, by becoming <a href="../../../java/lang/ref/package.html#reachability">unreachable</a>)
+     * until the target scope {@code S2} has also been closed.
+     * @param scope the target scope of the close dependency.
+     * @throws IllegalArgumentException if the target scope is the same as this scope.
+     * @throws IllegalStateException if the target scope is the same as this scope, or if this scope has already been closed,
+     * or if the target scope has already been closed.
      */
-    void bindTo(ResourceScope scope);
+    void addCloseDependency(ResourceScope scope);
 
     /**
      * Create a new confined scope. The resulting scope is closeable, and is not managed by a {@link Cleaner}.

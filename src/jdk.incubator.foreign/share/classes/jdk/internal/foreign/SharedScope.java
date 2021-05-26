@@ -95,7 +95,7 @@ public class SharedScope extends ResourceScopeImpl {
     }
 
     @Override
-    public void bindTo(ResourceScope scope) {
+    public void addCloseDependency(ResourceScope scope) {
         acquire();
         ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {
             @Override
