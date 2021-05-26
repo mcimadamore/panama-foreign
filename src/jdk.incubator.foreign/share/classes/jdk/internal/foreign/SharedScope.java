@@ -88,7 +88,7 @@ public class SharedScope extends ResourceScopeImpl implements Runnable {
             throw new IllegalStateException("Scope is acquired by " + prevState + " locks");
         }
         // avoid synchronization costs if there's no memory segment attached to this scope
-        boolean success = SCOPED_MEMORY_ACCESS.closeScope(this);
+        boolean success = true;//SCOPED_MEMORY_ACCESS.closeScope(this);
         STATE.setVolatile(this, success ? CLOSED : ALIVE);
         if (!success) {
             throw new IllegalStateException("Cannot close while another thread is accessing the segment");

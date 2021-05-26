@@ -29,11 +29,14 @@ import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.SegmentAllocator;
 import jdk.internal.misc.ScopedMemoryAccess;
-import jdk.internal.ref.CleanerFactory;
+import sun.security.action.GetBooleanAction;
 
 import java.lang.ref.Cleaner;
 
 public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAccess.Scope, SegmentAllocator {
+
+    private static final boolean sharedScopeSync = GetBooleanAction.privilegedGetProperty("sharedScope.sync");
+    private static final boolean sharedScopeOld = GetBooleanAction.privilegedGetProperty("sharedScope.old");
 
     static {
         ScopedMemoryAccess.implicitScopeSupplier = () -> createImplicitScope();
@@ -78,7 +81,9 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
      * @return a shared memory scope
      */
     public static ResourceScopeImpl createShared(Cleaner cleaner) {
-        return new SharedScope(cleaner);
+        return sharedScopeSync ?
+                new SharedScopeSync(cleaner) :
+                (sharedScopeOld ? new SharedScopeCAS(cleaner) : new SharedScope(cleaner));
     }
 
     public void addOrCleanupIfFail(Runnable runnable) {

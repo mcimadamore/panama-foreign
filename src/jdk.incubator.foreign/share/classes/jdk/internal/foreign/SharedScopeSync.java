@@ -26,22 +26,35 @@
 package jdk.internal.foreign;
 
 import jdk.incubator.foreign.ResourceScope;
+import jdk.internal.misc.ScopedMemoryAccess;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.ref.Cleaner;
 
-public class ConfinedScope extends ResourceScopeImpl implements Runnable {
+public class SharedScopeSync extends ResourceScopeImpl implements Runnable {
 
-    boolean closed;
-    final Thread ownerThread;
-    int lockCount;
+    private static final ScopedMemoryAccess SCOPED_MEMORY_ACCESS = ScopedMemoryAccess.getScopedMemoryAccess();
+
     final ResourceList resourceList = new ResourceList();
-    ResourceList resourceListToAdd = resourceList;
+    volatile ResourceList resourceListToAdd = resourceList;
+    volatile int lockCount;
+    volatile boolean closed;
 
-    public ConfinedScope(Thread ownerThread, Cleaner cleaner) {
-        this.ownerThread = ownerThread;
+    //private static final VarHandle STATE;
+
+    static {
+        try {
+            //        STATE = MethodHandles.lookup().findVarHandle(SharedScope.class, "state", int.class);
+        } catch (Throwable ex) {
+            throw new ExceptionInInitializerError(ex);
+        }
+    }
+
+    public SharedScopeSync(Cleaner cleaner) {
         if (cleaner != null) {
-            var localRef = resourceList;
-            cleaner.register(this, () -> localRef.cleanup()); // non-capturing
+            var localList = resourceList;
+            cleaner.register(this, () -> localList.cleanup());
         }
     }
 
@@ -52,7 +65,7 @@ public class ConfinedScope extends ResourceScopeImpl implements Runnable {
 
     @Override
     public Thread ownerThread() {
-        return ownerThread;
+        return null;
     }
 
     @Override
@@ -61,8 +74,10 @@ public class ConfinedScope extends ResourceScopeImpl implements Runnable {
     }
 
     @Override
-    public void close() {
-        checkValidState();
+    synchronized public void close() {
+        if (closed) {
+            throw new IllegalStateException("Already closed!");
+        }
         if (lockCount > 0) {
             throw new IllegalStateException("Scope is acquired by " + lockCount + " locks");
         }
@@ -71,39 +86,60 @@ public class ConfinedScope extends ResourceScopeImpl implements Runnable {
     }
 
     @Override
-    public void addCloseAction(Runnable runnable) {
-        checkValidState();
+    synchronized public void addCloseAction(Runnable runnable) {
+        checkValidStateSlow();
         resourceListToAdd = resourceListToAdd.add(runnable);
     }
 
     @Override
     public void bindTo(ResourceScope scope) {
-        checkValidState();
         acquire();
         scope.addCloseAction(this);
     }
 
     @Override
     public void checkValidState() {
-        if (ownerThread != Thread.currentThread()) {
-            throw new IllegalStateException("Attempted access outside owning thread");
-        }
         if (closed) {
-            throw new IllegalStateException("Already closed");
+            throw ScopedMemoryAccess.Scope.ScopedAccessError.INSTANCE;
         }
     }
 
-    private void acquire() {
+    synchronized private void acquire() {
+        checkValidStateSlow();
         lockCount++;
     }
 
-    private void release() {
+    synchronized private void release() {
         lockCount--;
     }
+
+//    private void acquire() {
+//        int value;
+//        do {
+//            value = (int) STATE.getVolatile(this);
+//            if (value < ALIVE) {
+//                //segment is not alive!
+//                throw new IllegalStateException("Already closed");
+//            } else if (value == MAX_FORKS) {
+//                //overflow
+//                throw new IllegalStateException("Segment acquire limit exceeded");
+//            }
+//        } while (!STATE.compareAndSet(this, value, value + 1));
+//    }
+//
+//    private void release() {
+//        int value;
+//        do {
+//            value = (int) STATE.getVolatile(this);
+//            if (value <= ALIVE) {
+//                //cannot get here - we can't close segment twice
+//                throw new IllegalStateException("Already closed");
+//            }
+//        } while (!STATE.compareAndSet(this, value, value - 1));
+//    }
 
     @Override
     public void run() {
         release();
     }
-
 }

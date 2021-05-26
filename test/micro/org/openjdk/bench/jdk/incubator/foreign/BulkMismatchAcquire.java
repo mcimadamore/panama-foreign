@@ -151,11 +151,10 @@ public class BulkMismatchAcquire {
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public long mismatch_small_segment_acquire() {
-        ResourceScope scope = ResourceScope.newConfinedScope();
-        mismatchSegmentSmall1.scope().bindTo(scope);
-        long res = mismatchSegmentSmall1.mismatch(mismatchSegmentSmall2);
-        scope.close();
-        return res;
+        try (ResourceScope scope = ResourceScope.newSharedScope()) {
+            mismatchSegmentSmall1.scope().bindTo(scope);
+            return mismatchSegmentSmall1.mismatch(mismatchSegmentSmall2);
+        }
     }
 
     @Benchmark
