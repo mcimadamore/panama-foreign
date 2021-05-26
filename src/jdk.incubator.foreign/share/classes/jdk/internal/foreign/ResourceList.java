@@ -68,22 +68,26 @@ class ResourceList {
 
     @SuppressWarnings("fallthrough")
     void cleanup() {
-        switch (size) {
-            default:
-                rest.cleanup();
-            case 5:
-                r5.run();
-            case 4:
-                r4.run();
-            case 3:
-                r3.run();
-            case 2:
-                r2.run();
-            case 1:
-                r1.run();
-            case 0:
-                break;
+        // avoid recursion - might be too deep
+        ResourceList curr = this;
+        while (curr != null) {
+            switch (curr.size) {
+                default:
+                case 5:
+                    curr.r5.run();
+                case 4:
+                    curr.r4.run();
+                case 3:
+                    curr.r3.run();
+                case 2:
+                    curr.r2.run();
+                case 1:
+                    curr.r1.run();
+                case 0:
+                    break;
+            }
+            curr.size = 0; // avoid further cleanups (e.g. by cleaner)
+            curr = curr.rest;
         }
-        size = 0; // avoid further cleanups (e.g. by cleaner)
     }
 }

@@ -41,7 +41,7 @@ public class ConfinedScope extends ResourceScopeImpl implements Runnable {
         this.ownerThread = ownerThread;
         if (cleaner != null) {
             var localRef = resourceList;
-            cleaner.register(this, () -> localRef.cleanup()); // non-capturing
+            cleaner.register(this, localRef::cleanup); // non-capturing
         }
     }
 

@@ -164,11 +164,10 @@ public class StrLenTest {
 
     @Benchmark
     public int panama_strlen_memsegmentpool_allocator() throws Throwable {
-        ResourceScope scope = ResourceScope.newConfinedScope();
-        final var allocator = memorySegmentPool.allocatorForScope(scope);
-        int len = (int)STRLEN.invokeExact(CLinker.toCString(str, allocator).address());
-        scope.close();
-        return len;
+        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+            final var allocator = memorySegmentPool.allocatorForScope(scope);
+            return (int) STRLEN.invokeExact(CLinker.toCString(str, allocator).address());
+        }
     }
 
 
