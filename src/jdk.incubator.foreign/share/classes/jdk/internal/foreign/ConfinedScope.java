@@ -59,7 +59,7 @@ public class ConfinedScope extends ResourceScopeImpl {
     public void close() {
         checkValidState();
         if (lockCount > 0) {
-            throw new IllegalStateException("Scope is acquired by " + lockCount + " locks");
+            throw new IllegalStateException("Scope has " + lockCount + " pending close dependencies");
         }
         closed = true;
         resourceList.cleanup();

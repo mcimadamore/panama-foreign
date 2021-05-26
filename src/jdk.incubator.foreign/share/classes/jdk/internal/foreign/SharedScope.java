@@ -124,7 +124,7 @@ public class SharedScope extends ResourceScopeImpl {
         if (prevState < 0) {
             throw new IllegalStateException("Already closed");
         } else if (prevState != ALIVE) {
-            throw new IllegalStateException("Scope is acquired by " + prevState + " locks");
+            throw new IllegalStateException("Scope has " + prevState + " pending close dependencies");
         }
         boolean success = !needsHandshake || SCOPED_MEMORY_ACCESS.closeScope(this);
         STATE.setVolatile(this, success ? CLOSED : ALIVE);
