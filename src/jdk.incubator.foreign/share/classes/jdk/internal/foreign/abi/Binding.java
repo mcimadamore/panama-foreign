@@ -30,7 +30,6 @@ import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.SegmentAllocator;
-import jdk.internal.foreign.ConfinedDependencyScope;
 import jdk.internal.foreign.MemoryAddressImpl;
 import jdk.internal.foreign.ResourceScopeImpl;
 
@@ -253,7 +252,7 @@ public abstract class Binding {
             return scope;
         }
 
-        public void addScopeDependency(ResourceScope scope) {
+        public void addScopeDependency(ResourceScopeImpl scope) {
             scope.addCloseDependency(scope());
         }
 
@@ -300,16 +299,7 @@ public abstract class Binding {
          * the context's allocator is accessed.
          */
         public static Context ofDependencyScope() {
-            ConfinedDependencyScope scope = new ConfinedDependencyScope();
-            return new Context(null, scope) {
-                @Override
-                public SegmentAllocator allocator() { throw new UnsupportedOperationException(); }
-
-                @Override
-                public void addScopeDependency(ResourceScope that) {
-                    ((ConfinedDependencyScope)scope()).registerScopeIfNeeded((ResourceScopeImpl)that);
-                }
-            };
+            return new ConfinedDependencyScope();
         }
 
         /**
@@ -332,6 +322,56 @@ public abstract class Binding {
                 // do nothing
             }
         };
+    }
+
+    static class ConfinedDependencyScope extends Binding.Context {
+
+        public ConfinedDependencyScope() {
+            super(null, null);
+        }
+
+        ResourceScopeImpl scope1, scope2, scope3, scope4, scope5;
+        int size;
+
+        @Override
+        @SuppressWarnings("fallthrough")
+        public void close() {
+            switch (size) {
+                case 5: scope5.release();
+                case 4: scope4.release();
+                case 3: scope3.release();
+                case 2: scope2.release();
+                case 1: scope1.release();
+            }
+        }
+
+        @Override
+        public void addScopeDependency(ResourceScopeImpl scope) {
+            if (!scope.isImplicit() && !hasAcquired(scope)) {
+                switch (size) {
+                    case 0 -> scope1 = scope;
+                    case 1 -> scope2 = scope;
+                    case 2 -> scope3 = scope;
+                    case 3 -> scope4 = scope;
+                    case 4 -> scope5 = scope;
+                    default -> throw new UnsupportedOperationException();
+                }
+                scope.acquire();
+                size++;
+            }
+        }
+
+        @SuppressWarnings("fallthrough")
+        private boolean hasAcquired(ResourceScopeImpl scope) {
+            switch (size) {
+                case 5: if (scope5 == scope) return true;
+                case 4: if (scope4 == scope) return true;
+                case 3: if (scope3 == scope) return true;
+                case 2: if (scope2 == scope) return true;
+                case 1: if (scope1 == scope) return true;
+                default: return false;
+            }
+        }
     }
 
     enum Tag {
@@ -928,7 +968,7 @@ public abstract class Binding {
 
         static long unbox(MemoryAddress ma, Context ctx) {
             if (ctx != null) {
-                ctx.addScopeDependency(ma.scope());
+                ctx.addScopeDependency((ResourceScopeImpl)ma.scope());
             } else {
                 if (ma.scope() != ResourceScope.globalScope()) {
                     throw new UnsupportedOperationException("Cannot return address not in the global scope");

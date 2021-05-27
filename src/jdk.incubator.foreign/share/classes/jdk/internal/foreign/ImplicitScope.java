@@ -70,12 +70,12 @@ public class ImplicitScope extends ResourceScopeImpl {
     }
 
     @Override
-    void acquire() {
+    public void acquire() {
         // do nothing
     }
 
     @Override
-    void release() {
+    public void release() {
         Reference.reachabilityFence(this);
     }
 }

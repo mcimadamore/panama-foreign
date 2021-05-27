@@ -81,12 +81,12 @@ public class ConfinedScope extends ResourceScopeImpl {
         }
     }
 
-    void acquire() {
+    public void acquire() {
         checkValidState();
         lockCount++;
     }
 
-    void release() {
+    public void release() {
         lockCount--;
     }
 }

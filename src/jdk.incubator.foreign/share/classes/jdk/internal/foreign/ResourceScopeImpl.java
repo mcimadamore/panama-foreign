@@ -111,9 +111,9 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
         }, true);
     }
 
-    abstract void acquire();
+    public abstract void acquire();
 
-    abstract void release();
+    public abstract void release();
 
     @Override
     public final void addCloseAction(Runnable runnable) {

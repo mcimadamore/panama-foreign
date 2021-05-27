@@ -95,7 +95,7 @@ public class SharedScope extends ResourceScopeImpl {
     }
 
     @Override
-    void acquire() {
+    public void acquire() {
         int value;
         do {
             value = (int) STATE.getVolatile(this);
@@ -130,7 +130,7 @@ public class SharedScope extends ResourceScopeImpl {
     }
 
     @Override
-    void release() {
+    public void release() {
         int value;
         do {
             value = (int) STATE.getVolatile(this);
