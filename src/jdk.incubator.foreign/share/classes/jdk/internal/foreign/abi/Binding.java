@@ -347,7 +347,7 @@ public abstract class Binding {
 
         @Override
         public void addScopeDependency(ResourceScopeImpl scope) {
-            if (!scope.isImplicit() && !hasAcquired(scope)) {
+            if (!hasAcquired(scope)) {
                 switch (size) {
                     case 0 -> scope1 = scope;
                     case 1 -> scope2 = scope;
@@ -967,12 +967,12 @@ public abstract class Binding {
         }
 
         static long unbox(MemoryAddress ma, Context ctx) {
-            if (ctx != null) {
-                ctx.addScopeDependency((ResourceScopeImpl)ma.scope());
-            } else {
+            if (ctx == null) {
                 if (ma.scope() != ResourceScope.globalScope()) {
                     throw new UnsupportedOperationException("Cannot return address not in the global scope");
                 }
+            } else if (!ma.scope().isImplicit()) {
+                ctx.addScopeDependency((ResourceScopeImpl)ma.scope());
             }
             return ma.toRawLongValue();
         }

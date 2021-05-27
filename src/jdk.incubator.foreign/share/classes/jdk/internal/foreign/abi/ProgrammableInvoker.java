@@ -32,6 +32,7 @@ import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.SegmentAllocator;
 import jdk.internal.access.JavaLangInvokeAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.foreign.ResourceScopeImpl;
 import jdk.internal.invoke.NativeEntryPoint;
 import jdk.internal.invoke.VMStorageProxy;
 import sun.security.action.GetPropertyAction;
@@ -210,7 +211,8 @@ public class ProgrammableInvoker {
         int argInsertPos = 1;
         int argContextPos = 1;
 
-        MethodHandle specializedHandle = dropArguments(leafHandle, argContextPos, Binding.Context.class);
+        //MethodHandle specializedHandle = dropArguments(leafHandle, argContextPos, Binding.Context.class);
+        MethodHandle specializedHandle = collectArguments(leafHandle, 0, SharedUtils.MH_CHECK_ADDRESS);
 
         for (int i = 0; i < highLevelType.parameterCount(); i++) {
             List<Binding> bindings = callingSequence.argumentBindings(i);
@@ -322,6 +324,9 @@ public class ProgrammableInvoker {
             // do argument processing, get Object[] as result
             Object[] leafArgs = new Object[leaf.type().parameterCount()];
             leafArgs[0] = address; // addr
+            if (!address.address().scope().isImplicit()) {
+                unboxContext.addScopeDependency((ResourceScopeImpl)address.address().scope());
+            }
             for (int i = 0; i < args.length; i++) {
                 Object arg = args[i];
                 BindingInterpreter.unbox(arg, callingSequence.argumentBindings(i),

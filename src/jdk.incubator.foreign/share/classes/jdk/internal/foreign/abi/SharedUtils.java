@@ -39,6 +39,7 @@ import jdk.incubator.foreign.CLinker;
 import jdk.incubator.foreign.ValueLayout;
 import jdk.internal.foreign.CABI;
 import jdk.internal.foreign.MemoryAddressImpl;
+import jdk.internal.foreign.ResourceScopeImpl;
 import jdk.internal.foreign.Utils;
 import jdk.internal.foreign.abi.aarch64.AArch64Linker;
 import jdk.internal.foreign.abi.x64.sysv.SysVx64Linker;
@@ -80,6 +81,7 @@ public class SharedUtils {
     private static final MethodHandle MH_MAKE_CONTEXT_BOUNDED_ALLOCATOR;
     private static final MethodHandle MH_CLOSE_CONTEXT;
     private static final MethodHandle MH_REACHBILITY_FENCE;
+    public static final MethodHandle MH_CHECK_ADDRESS;
 
     static {
         try {
@@ -100,6 +102,8 @@ public class SharedUtils {
                     methodType(void.class));
             MH_REACHBILITY_FENCE = lookup.findStatic(Reference.class, "reachabilityFence",
                     methodType(void.class, Object.class));
+            MH_CHECK_ADDRESS = lookup.findStatic(SharedUtils.class, "checkAddress",
+                    methodType(Addressable.class, Addressable.class, Binding.Context.class));
         } catch (ReflectiveOperationException e) {
             throw new BootstrapMethodError(e);
         }
@@ -385,19 +389,19 @@ public class SharedUtils {
 
         closer = collectArguments(closer, insertPos++, MH_CLOSE_CONTEXT); // (Throwable, V?, Addressable?, BindingContext) -> V/void
 
-//        if (!upcall) {
-//            // now for each Addressable parameter, add a reachability fence
-//            MethodType specType = specializedHandle.type();
-//            // skip 3 for address, segment allocator, and binding context
-//            for (int i = 3; i < specType.parameterCount(); i++) {
-//                Class<?> param = specType.parameterType(i);
-//                if (Addressable.class.isAssignableFrom(param)) {
-//                    closer = collectArguments(closer, insertPos++, reachabilityFenceHandle(param));
-//                } else {
-//                    closer = dropArguments(closer, insertPos++, param);
-//                }
-//            }
-//        }
+        if (!upcall) {
+            // now for each Addressable parameter, add a reachability fence
+            MethodType specType = specializedHandle.type();
+            // skip 3 for address, segment allocator, and binding context
+            for (int i = 3; i < specType.parameterCount(); i++) {
+                Class<?> param = specType.parameterType(i);
+                if (Addressable.class.isAssignableFrom(param)) {
+                    closer = collectArguments(closer, insertPos++, reachabilityFenceHandle(param));
+                } else {
+                    closer = dropArguments(closer, insertPos++, param);
+                }
+            }
+        }
 
         MethodHandle contextFactory;
 
@@ -664,5 +668,13 @@ public class SharedUtils {
         } else {
             throw new IllegalArgumentException("Unsupported carrier: " + type);
         }
+    }
+
+    static Addressable checkAddress(Addressable addressable, Binding.Context context) {
+        var scope = addressable.address().scope();
+        if (!scope.isImplicit()) {
+            context.addScopeDependency((ResourceScopeImpl) addressable.address().scope());
+        }
+        return addressable;
     }
 }
