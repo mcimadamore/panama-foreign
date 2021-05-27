@@ -42,7 +42,6 @@ public class CallingSequenceBuilder {
     private static final boolean VERIFY_BINDINGS = Boolean.parseBoolean(
             GetPropertyAction.privilegedGetProperty("jdk.incubator.foreign.VERIFY_BINDINGS", "true"));
 
-    private CallingSequence.SafetyLevel safetyLevel = CallingSequence.SafetyLevel.DEFAULT;
     private final boolean forUpcall;
     private final List<List<Binding>> inputBindings = new ArrayList<>();
     private List<Binding> outputBindings = List.of();
@@ -72,13 +71,8 @@ public class CallingSequenceBuilder {
         return this;
     }
 
-    public CallingSequenceBuilder setSafetyLevel(CallingSequence.SafetyLevel safetyLevel) {
-        this.safetyLevel = safetyLevel;
-        return this;
-    }
-
     public CallingSequence build() {
-        return new CallingSequence(mt, desc, safetyLevel, inputBindings, outputBindings);
+        return new CallingSequence(mt, desc, inputBindings, outputBindings);
     }
 
     private void verifyBindings(boolean forArguments, Class<?> carrier, List<Binding> bindings) {

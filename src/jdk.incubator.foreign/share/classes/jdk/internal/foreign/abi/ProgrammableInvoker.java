@@ -25,6 +25,7 @@
 package jdk.internal.foreign.abi;
 
 import jdk.incubator.foreign.Addressable;
+import jdk.incubator.foreign.CLinker;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
@@ -103,13 +104,13 @@ public class ProgrammableInvoker {
 
     private final CallingSequence callingSequence;
 
-    private final CallingSequence.SafetyLevel safetyLevel;
+    private final int invMode;
 
     private final long stubAddress;
 
     private final long bufferCopySize;
 
-    public ProgrammableInvoker(ABIDescriptor abi, CallingSequence callingSequence) {
+    public ProgrammableInvoker(ABIDescriptor abi, CallingSequence callingSequence, int invMode) {
         this.abi = abi;
         this.layout = BufferLayout.of(abi);
         this.stubAddress = adapterStubs.computeIfAbsent(abi, key -> generateAdapter(key, layout));
@@ -123,7 +124,7 @@ public class ProgrammableInvoker {
                 * abi.arch.typeSize(abi.arch.stackType());
 
         this.bufferCopySize = SharedUtils.bufferCopySize(callingSequence);
-        this.safetyLevel = callingSequence.safetyLevel();
+        this.invMode = invMode;
     }
 
     public MethodHandle getBoundMethodHandle() {
@@ -153,7 +154,7 @@ public class ProgrammableInvoker {
                 abi,
                 toStorageArray(argMoves),
                 toStorageArray(retMoves),
-                !callingSequence.isTrivial(),
+                    (invMode & CLinker.NO_STATE_TRANSITIONS) == 0,
                 leafTypeWithAddress
             );
 
@@ -214,7 +215,7 @@ public class ProgrammableInvoker {
         int argInsertPos = 1;
         int argContextPos = 1;
 
-        MethodHandle specializedHandle = collectArguments(leafHandle, 0, insertArguments(SharedUtils.MH_CHECK_ADDRESS, 1, safetyLevel));
+        MethodHandle specializedHandle = collectArguments(leafHandle, 0, insertArguments(SharedUtils.MH_CHECK_ADDRESS, 1, invMode));
 
         for (int i = 0; i < highLevelType.parameterCount(); i++) {
             List<Binding> bindings = callingSequence.argumentBindings(i);
@@ -225,7 +226,7 @@ public class ProgrammableInvoker {
                 if (binding.tag() == Binding.Tag.VM_STORE) {
                     argInsertPos--;
                 } else {
-                    specializedHandle = binding.specialize(specializedHandle, argInsertPos, argContextPos, safetyLevel);
+                    specializedHandle = binding.specialize(specializedHandle, argInsertPos, argContextPos, invMode);
                 }
             }
         }
@@ -238,7 +239,7 @@ public class ProgrammableInvoker {
             List<Binding> bindings = callingSequence.returnBindings();
             for (int j = bindings.size() - 1; j >= 0; j--) {
                 Binding binding = bindings.get(j);
-                returnFilter = binding.specialize(returnFilter, retInsertPos, retContextPos, safetyLevel);
+                returnFilter = binding.specialize(returnFilter, retInsertPos, retContextPos, invMode);
             }
             returnFilter = MethodHandles.filterArguments(returnFilter, retContextPos, MH_WRAP_ALLOCATOR);
             // (SegmentAllocator, Addressable, Context, ...) -> ...
@@ -253,7 +254,7 @@ public class ProgrammableInvoker {
 
         argContextPos++; // skip over the return SegmentAllocator (inserted by the above code)
         specializedHandle = SharedUtils.wrapWithAllocator(specializedHandle, argContextPos, bufferCopySize,
-                false, safetyLevel);
+                false, callingSequence.hasAddressParameters(), invMode);
         return specializedHandle;
     }
 
@@ -322,7 +323,7 @@ public class ProgrammableInvoker {
                                 Map<VMStorage, Integer> retIndexMap) throws Throwable {
         Binding.Context unboxContext = bufferCopySize != 0
                 ? Binding.Context.ofBoundedAllocator(bufferCopySize)
-                : (safetyLevel == CallingSequence.SafetyLevel.DEFAULT ? Binding.Context.ofDependencyScope() : Binding.Context.DUMMY);
+                : ((invMode & CLinker.KEEP_EXPLICIT_SCOPES_ALIVE) != 0 ? Binding.Context.ofDependencyScope() : Binding.Context.DUMMY);
         try (unboxContext) {
             // do argument processing, get Object[] as result
             Object[] leafArgs = new Object[leaf.type().parameterCount()];
@@ -335,7 +336,7 @@ public class ProgrammableInvoker {
                 BindingInterpreter.unbox(arg, callingSequence.argumentBindings(i),
                         (storage, type, value) -> {
                             leafArgs[argIndexMap.get(storage) + 1] = value; // +1 to skip addr
-                        }, safetyLevel, unboxContext);
+                        }, invMode, unboxContext);
             }
 
             // call leaf
@@ -351,10 +352,10 @@ public class ProgrammableInvoker {
             } else if (o instanceof Object[]) {
                 Object[] oArr = (Object[]) o;
                 return BindingInterpreter.box(callingSequence.returnBindings(),
-                        (storage, type) -> oArr[retIndexMap.get(storage)], safetyLevel, Binding.Context.ofAllocator(allocator));
+                        (storage, type) -> oArr[retIndexMap.get(storage)], invMode, Binding.Context.ofAllocator(allocator));
             } else {
                 return BindingInterpreter.box(callingSequence.returnBindings(), (storage, type) -> o,
-                        safetyLevel, Binding.Context.ofAllocator(allocator));
+                        invMode, Binding.Context.ofAllocator(allocator));
             }
         }
     }

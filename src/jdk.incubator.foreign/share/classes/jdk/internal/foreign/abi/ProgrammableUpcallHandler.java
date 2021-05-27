@@ -25,6 +25,7 @@
 
 package jdk.internal.foreign.abi;
 
+import jdk.incubator.foreign.CLinker;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
@@ -80,13 +81,13 @@ public class ProgrammableUpcallHandler {
                                Binding.VMLoad[].class, Binding.VMStore[].class, ABIDescriptor.class, BufferLayout.class));
             MH_invokeInterpBindings = lookup.findStatic(ProgrammableUpcallHandler.class, "invokeInterpBindings",
                     methodType(Object.class, Object[].class, MethodHandle.class, Map.class, Map.class,
-                            CallingSequence.class, long.class));
+                            CallingSequence.class, long.class, int.class));
         } catch (ReflectiveOperationException e) {
             throw new InternalError(e);
         }
     }
 
-    public static UpcallHandler make(ABIDescriptor abi, MethodHandle target, CallingSequence callingSequence) {
+    public static UpcallHandler make(ABIDescriptor abi, MethodHandle target, CallingSequence callingSequence, int invMode) {
         Binding.VMLoad[] argMoves = argMoveBindings(callingSequence);
         Binding.VMStore[] retMoves = retMoveBindings(callingSequence);
 
@@ -103,14 +104,14 @@ public class ProgrammableUpcallHandler {
         MethodHandle doBindings;
         long bufferCopySize = SharedUtils.bufferCopySize(callingSequence);
         if (USE_SPEC && isSimple) {
-            doBindings = specializedBindingHandle(target, callingSequence, llReturn, bufferCopySize);
+            doBindings = specializedBindingHandle(target, callingSequence, llReturn, bufferCopySize, invMode);
             assert doBindings.type() == llType;
         } else {
             Map<VMStorage, Integer> argIndices = SharedUtils.indexMap(argMoves);
             Map<VMStorage, Integer> retIndices = SharedUtils.indexMap(retMoves);
             target = target.asSpreader(Object[].class, callingSequence.methodType().parameterCount());
             doBindings = insertArguments(MH_invokeInterpBindings, 1, target, argIndices, retIndices, callingSequence,
-                    bufferCopySize);
+                    bufferCopySize, invMode);
             doBindings = doBindings.asCollector(Object[].class, llType.parameterCount());
             doBindings = doBindings.asType(llType);
         }
@@ -160,10 +161,9 @@ public class ProgrammableUpcallHandler {
     }
 
     private static MethodHandle specializedBindingHandle(MethodHandle target, CallingSequence callingSequence,
-                                                         Class<?> llReturn, long bufferCopySize) {
+                                                         Class<?> llReturn, long bufferCopySize, int invMode) {
         MethodType highLevelType = callingSequence.methodType();
 
-        CallingSequence.SafetyLevel safetyLevel = callingSequence.safetyLevel();
         MethodHandle specializedHandle = target; // initial
 
         int argAllocatorPos = 0;
@@ -178,7 +178,7 @@ public class ProgrammableUpcallHandler {
             List<Binding> bindings = callingSequence.argumentBindings(i);
             for (int j = bindings.size() - 1; j >= 0; j--) {
                 Binding binding = bindings.get(j);
-                filter = binding.specialize(filter, filterInsertPos, filterAllocatorPos, safetyLevel);
+                filter = binding.specialize(filter, filterInsertPos, filterAllocatorPos, invMode);
             }
             specializedHandle = MethodHandles.collectArguments(specializedHandle, argInsertPos, filter);
             specializedHandle = mergeArguments(specializedHandle, argAllocatorPos, argInsertPos + filterAllocatorPos);
@@ -192,13 +192,13 @@ public class ProgrammableUpcallHandler {
             List<Binding> bindings = callingSequence.returnBindings();
             for (int j = bindings.size() - 1; j >= 0; j--) {
                 Binding binding = bindings.get(j);
-                filter = binding.specialize(filter, retInsertPos, retAllocatorPos, safetyLevel);
+                filter = binding.specialize(filter, retInsertPos, retAllocatorPos, invMode);
             }
             specializedHandle = filterReturnValue(specializedHandle, filter);
         }
 
         specializedHandle = SharedUtils.wrapWithAllocator(specializedHandle, argAllocatorPos, bufferCopySize,
-                true, safetyLevel);
+                true, callingSequence.hasAddressParameters(), invMode);
 
         return specializedHandle;
     }
@@ -257,17 +257,17 @@ public class ProgrammableUpcallHandler {
                                                Map<VMStorage, Integer> argIndexMap,
                                                Map<VMStorage, Integer> retIndexMap,
                                                CallingSequence callingSequence,
-                                               long bufferCopySize) throws Throwable {
+                                               long bufferCopySize,
+                                               int invMode) throws Throwable {
         Binding.Context allocator = bufferCopySize != 0
                 ? Binding.Context.ofBoundedAllocator(bufferCopySize)
                 : Binding.Context.ofScope();
-        CallingSequence.SafetyLevel safetyLevel = callingSequence.safetyLevel();
         try (allocator) {
             /// Invoke interpreter, got array of high-level arguments back
             Object[] args = new Object[callingSequence.methodType().parameterCount()];
             for (int i = 0; i < args.length; i++) {
                 args[i] = BindingInterpreter.box(callingSequence.argumentBindings(i),
-                        (storage, type) -> moves[argIndexMap.get(storage)], safetyLevel, allocator);
+                        (storage, type) -> moves[argIndexMap.get(storage)], invMode, allocator);
             }
 
             if (DEBUG) {
@@ -286,7 +286,7 @@ public class ProgrammableUpcallHandler {
             Object[] returnMoves = new Object[retIndexMap.size()];
             if (leaf.type().returnType() != void.class) {
                 BindingInterpreter.unbox(o, callingSequence.returnBindings(),
-                        (storage, type, value) -> returnMoves[retIndexMap.get(storage)] = value, safetyLevel, null);
+                        (storage, type, value) -> returnMoves[retIndexMap.get(storage)] = value, invMode, null);
             }
 
             if (returnMoves.length == 0) {

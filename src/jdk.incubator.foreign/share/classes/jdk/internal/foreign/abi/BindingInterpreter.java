@@ -30,19 +30,19 @@ import java.util.List;
 
 public class BindingInterpreter {
 
-    static void unbox(Object arg, List<Binding> bindings, StoreFunc storeFunc, CallingSequence.SafetyLevel safetyLevel, Binding.Context context) {
+    static void unbox(Object arg, List<Binding> bindings, StoreFunc storeFunc, int invMode, Binding.Context context) {
         Deque<Object> stack = new ArrayDeque<>();
 
         stack.push(arg);
         for (Binding b : bindings) {
-            b.interpret(stack, storeFunc, null, safetyLevel, context);
+            b.interpret(stack, storeFunc, null, invMode, context);
         }
     }
 
-    static Object box(List<Binding> bindings, LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Binding.Context context) {
+    static Object box(List<Binding> bindings, LoadFunc loadFunc, int invMode, Binding.Context context) {
         Deque<Object> stack = new ArrayDeque<>();
         for (Binding b : bindings) {
-            b.interpret(stack, null, loadFunc, safetyLevel, context);
+            b.interpret(stack, null, loadFunc, invMode, context);
         }
        return stack.pop();
     }

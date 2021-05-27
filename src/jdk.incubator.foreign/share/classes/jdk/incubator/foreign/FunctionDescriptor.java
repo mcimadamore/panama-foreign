@@ -48,13 +48,6 @@ import java.util.stream.Stream;
  */
 public final class FunctionDescriptor implements Constable {
 
-    /**
-     * The name of the function descriptor attribute (see {@link #attributes()} used to mark trivial functions. The
-     * attribute value must be a boolean.
-     */
-    public static final String TRIVIAL_ATTRIBUTE_NAME = "abi/trivial";
-    public static final String IMPLICIT_ATTRIBUTE_NAME = "abi/implicit";
-
     private final MemoryLayout resLayout;
     private final MemoryLayout[] argLayouts;
     private final Map<String, Constable> attributes;

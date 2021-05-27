@@ -37,6 +37,7 @@ import jdk.internal.reflect.Reflection;
 import java.lang.constant.Constable;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
+import java.lang.ref.Cleaner;
 import java.nio.charset.Charset;
 import java.util.Objects;
 import java.util.Optional;
@@ -148,7 +149,8 @@ public interface CLinker {
 
     /**
      * Obtains a foreign method handle, with the given type and featuring the given function descriptor,
-     * which can be used to call a target foreign function at the given address.
+     * which can be used to call a target foreign function at the given address, with the {@link #DEFAULT_MODE default}
+     * invocation mode.
      * <p>
      * If the provided method type's return type is {@code MemorySegment}, then the resulting method handle features
      * an additional prefix parameter, of type {@link SegmentAllocator}, which will be used by the linker runtime
@@ -171,7 +173,8 @@ public interface CLinker {
 
     /**
      * Obtain a foreign method handle, with the given type and featuring the given function descriptor,
-     * which can be used to call a target foreign function at the given address.
+     * which can be used to call a target foreign function at the given address, with the {@link #DEFAULT_MODE default}
+     * invocation mode.
      * <p>
      * If the provided method type's return type is {@code MemorySegment}, then the provided allocator will be used by
      * the linker runtime to allocate structs returned by-value.
@@ -195,7 +198,7 @@ public interface CLinker {
 
     /**
      * Obtains a foreign method handle, with the given type and featuring the given function descriptor, which can be
-     * used to call a target foreign function at an address.
+     * used to call a target foreign function at an address, with the {@link #DEFAULT_MODE default} invocation mode.
      * The resulting method handle features a prefix parameter (as the first parameter) corresponding to the address, of
      * type {@link Addressable}.
      * <p>
@@ -221,8 +224,40 @@ public interface CLinker {
     MethodHandle downcallHandle(MethodType type, FunctionDescriptor function);
 
     /**
+     * Obtains a foreign method handle, with the given type and featuring the given function descriptor, which can be
+     * used to call a target foreign function at an address, with a specified invocation mode.
+     * The resulting method handle features a prefix parameter (as the first parameter) corresponding to the address, of
+     * type {@link Addressable}.
+     * <p>
+     * If the provided method type's return type is {@code MemorySegment}, then the resulting method handle features an
+     * additional prefix parameter (inserted immediately after the address parameter), of type {@link SegmentAllocator}),
+     * which will be used by the linker runtime to allocate structs returned by-value.
+     * <p>
+     * The returned method handle will throw an {@link IllegalArgumentException} if the target address passed to it is
+     * {@link MemoryAddress#NULL}, or a {@link NullPointerException} if the target address is {@code null}.
+     * <p>
+     * This method is <a href="package-summary.html#restricted"><em>restricted</em></a>.
+     * Restricted method are unsafe, and, if used incorrectly, their use might crash
+     * the JVM or, worse, silently result in memory corruption. Thus, clients should refrain from depending on
+     * restricted methods, and use safe and supported functionalities, where possible.
+     **
+     * @see SymbolLookup
+     *
+     * @param type     the method type.
+     * @param function the function descriptor.
+     * @param invMode  the downcall method handle invocation mode; a mask obtained combining one or more of the
+     *                 invocation mode flags {@link #NO_STATE_TRANSITIONS}, {@link #KEEP_EXPLICIT_SCOPES_ALIVE},
+     *                 {@link #KEEP_IMPLICIT_SCOPES_ALIVE} and {@link #CHECK_UPCALL_RETURN_SCOPES}..
+     * @return the downcall method handle.
+     * @throws IllegalArgumentException in the case of a method type and function descriptor mismatch, or if the invocation
+     * mode mask is not a valid combination of the supported invocation mode flags.
+     */
+    MethodHandle downcallHandle(MethodType type, FunctionDescriptor function, int invMode);
+
+    /**
      * Allocates a native stub with given scope which can be passed to other foreign functions (as a function pointer);
-     * calling such a function pointer from native code will result in the execution of the provided method handle.
+     * calling such a function pointer from native code will result in the execution of the provided method handle,
+     * with the {@link #DEFAULT_MODE default} invocation mode.
      *
      * <p>The returned memory address is associated with the provided scope. When such scope is closed,
      * the corresponding native stub will be deallocated.
@@ -239,6 +274,30 @@ public interface CLinker {
      * @throws IllegalArgumentException if the target's method type and the function descriptor mismatch.
      */
     MemoryAddress upcallStub(MethodHandle target, FunctionDescriptor function, ResourceScope scope);
+
+    /**
+     * Allocates a native stub with given scope which can be passed to other foreign functions (as a function pointer);
+     * calling such a function pointer from native code will result in the execution of the provided method handle,
+     * with a specified invocation mode.
+     *
+     * <p>The returned memory address is associated with the provided scope. When such scope is closed,
+     * the corresponding native stub will be deallocated.
+     * <p>
+     * This method is <a href="package-summary.html#restricted"><em>restricted</em></a>.
+     * Restricted method are unsafe, and, if used incorrectly, their use might crash
+     * the JVM or, worse, silently result in memory corruption. Thus, clients should refrain from depending on
+     * restricted methods, and use safe and supported functionalities, where possible.
+     *
+     * @param target   the target method handle.
+     * @param function the function descriptor.
+     * @param scope the upcall stub scope.
+     * @param invMode  the upcall method handle invocation mode; a mask obtained combining one or more of the
+     *                 invocation mode flags {@link #NO_STATE_TRANSITIONS}, {@link #KEEP_EXPLICIT_SCOPES_ALIVE},
+     *                 {@link #KEEP_IMPLICIT_SCOPES_ALIVE} and {@link #CHECK_UPCALL_RETURN_SCOPES}.
+     * @return the native stub segment.
+     * @throws IllegalArgumentException if the target's method type and the function descriptor mismatch.
+     */
+    MemoryAddress upcallStub(MethodHandle target, FunctionDescriptor function, ResourceScope scope, int invMode);
 
     /**
      * The layout for the {@code char} C type
@@ -862,4 +921,41 @@ public interface CLinker {
          */
         public static final String ATTR_NAME = "abi/kind";
     }
+
+    /**
+     * Removes Java to native state transitions when calling a downcall method handle. While this leads to
+     * better performance, it can also lead to JVM crashes (e.g. if the native code needs to upcall some other
+     * Java code), or stall the garbage collector for an indefinite amount of time. As such, this mode should
+     * be used with caution, and only to call native short, non-blocking native functions.
+     */
+    int NO_STATE_TRANSITIONS = 1;
+
+    /**
+     * Keeps {@link ResourceScope#newImplicitScope() implicit} scopes associated with memory address arguments passed to a
+     * downcall method handle <em>reachable</em> until the call completes. This mode avoids issues with implicit scopes becoming
+     * unreachable too early, potentially causing memory to be released while the native code is still executing.
+     */
+    int KEEP_IMPLICIT_SCOPES_ALIVE = NO_STATE_TRANSITIONS << 1;
+
+    /**
+     * Keeps explicit scopes (whether {@link ResourceScope#newConfinedScope() confined} or {@link ResourceScope#newSharedScope() shared}
+     * associated with memory address arguments passed to downcall method handle <em>alive</em>, until the call completes.
+     * This mode avoids issues with explicit scopes being closed too early, either by a concurrent thread (if the scope is shared)
+     * or by the same thread (if the scope is confined and an upcall stub is being executed), potentially causing memory
+     * to be released while the native code is still executing.
+     */
+    int KEEP_EXPLICIT_SCOPES_ALIVE = KEEP_IMPLICIT_SCOPES_ALIVE << 1;
+
+    /**
+     * When an upcall returns a memory address, check that the address belongs to the {@link ResourceScope#globalScope() global}
+     * resource scope. Attempting to return an address backed by another kind of scope might lead to issues, as
+     * implicit scopes might become unreachable, while explicit scopes created inside an upcall might never be closed.
+     */
+    int CHECK_UPCALL_RETURN_SCOPES = KEEP_EXPLICIT_SCOPES_ALIVE << 1;
+
+    /**
+     * Default mode associated with downcall method handles. Defined as
+     * {@code KEEP_EXPLICIT_SCOPES_ALIVE | KEEP_IMPLICIT_SCOPES_ALIVE | CHECK_UPCALL_RETURN_SCOPES}.
+     */
+    int DEFAULT_MODE = KEEP_EXPLICIT_SCOPES_ALIVE | KEEP_IMPLICIT_SCOPES_ALIVE | CHECK_UPCALL_RETURN_SCOPES;
 }

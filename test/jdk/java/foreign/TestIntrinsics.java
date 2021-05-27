@@ -47,7 +47,6 @@ import org.testng.annotations.*;
 
 import static java.lang.invoke.MethodType.methodType;
 import static jdk.incubator.foreign.CLinker.*;
-import static jdk.incubator.foreign.FunctionDescriptor.TRIVIAL_ATTRIBUTE_NAME;
 import static org.testng.Assert.assertEquals;
 
 public class TestIntrinsics {
@@ -93,7 +92,7 @@ public class TestIntrinsics {
             FunctionDescriptor fd = FunctionDescriptor.of(layout, layout);
 
             tests.add(abi.downcallHandle(ma, mt, fd), arg, arg);
-            tests.add(abi.downcallHandle(ma, mt, fd.withAttribute(TRIVIAL_ATTRIBUTE_NAME, true)), arg, arg);
+            tests.add(abi.downcallHandle(mt, fd, NO_STATE_TRANSITIONS).bindTo(ma), arg, arg);
             tests.add(abi.downcallHandle(mt, fd), arg, ma, arg);
         };
 
@@ -102,7 +101,7 @@ public class TestIntrinsics {
             MethodType mt = methodType(void.class);
             FunctionDescriptor fd = FunctionDescriptor.ofVoid();
             tests.add(abi.downcallHandle(ma, mt, fd), null);
-            tests.add(abi.downcallHandle(ma, mt, fd.withAttribute(TRIVIAL_ATTRIBUTE_NAME, true)), null);
+            tests.add(abi.downcallHandle(mt, fd, NO_STATE_TRANSITIONS).bindTo(ma), null);
         }
 
         addIdentity.add("identity_char",   byte.class,   C_CHAR,   (byte) 10);
@@ -118,7 +117,7 @@ public class TestIntrinsics {
             FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_INT, asVarArg(C_DOUBLE),
                     asVarArg(C_INT), asVarArg(C_FLOAT), asVarArg(C_LONG_LONG));
             tests.add(abi.downcallHandle(ma, mt, fd), 1, 1, 10D, 2, 3F, 4L);
-            tests.add(abi.downcallHandle(ma, mt, fd.withAttribute(TRIVIAL_ATTRIBUTE_NAME, true)), 1, 1, 10D, 2, 3F, 4L);
+            tests.add(abi.downcallHandle(mt, fd, NO_STATE_TRANSITIONS).bindTo(ma), 1, 1, 10D, 2, 3F, 4L);
         }
 
         { // high_arity
@@ -133,7 +132,7 @@ public class TestIntrinsics {
                 FunctionDescriptor fd = baseFD.withReturnLayout(baseFD.argumentLayouts().get(i));
                 Object expected = args[i];
                 tests.add(abi.downcallHandle(ma, mt, fd), expected, args);
-                tests.add(abi.downcallHandle(ma, mt, fd.withAttribute(TRIVIAL_ATTRIBUTE_NAME, true)), expected, args);
+                tests.add(abi.downcallHandle(mt, fd, NO_STATE_TRANSITIONS).bindTo(ma), expected, args);
             }
         }
 
