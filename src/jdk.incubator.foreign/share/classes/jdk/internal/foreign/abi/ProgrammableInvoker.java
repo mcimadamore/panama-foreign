@@ -250,7 +250,8 @@ public class ProgrammableInvoker {
         // now bind the internal context parameter
 
         argContextPos++; // skip over the return SegmentAllocator (inserted by the above code)
-        specializedHandle = SharedUtils.wrapWithAllocator(specializedHandle, argContextPos, bufferCopySize, false);
+        specializedHandle = SharedUtils.wrapWithAllocator(specializedHandle, argContextPos, bufferCopySize,
+                false, callingSequence.needsScopeTracking());
         return specializedHandle;
     }
 
@@ -319,7 +320,7 @@ public class ProgrammableInvoker {
                                 Map<VMStorage, Integer> retIndexMap) throws Throwable {
         Binding.Context unboxContext = bufferCopySize != 0
                 ? Binding.Context.ofBoundedAllocator(bufferCopySize)
-                : Binding.Context.ofDependencyScope();
+                : (callingSequence.needsScopeTracking() ? Binding.Context.ofDependencyScope() : Binding.Context.DUMMY);
         try (unboxContext) {
             // do argument processing, get Object[] as result
             Object[] leafArgs = new Object[leaf.type().parameterCount()];

@@ -368,7 +368,7 @@ public class SharedUtils {
 
     static MethodHandle wrapWithAllocator(MethodHandle specializedHandle,
                                           int allocatorPos, long bufferCopySize,
-                                          boolean upcall) {
+                                          boolean upcall, boolean needsScopeTracking) {
         // insert try-finally to close the NativeScope used for Binding.Copy
         MethodHandle closer;
         int insertPos;
@@ -409,9 +409,11 @@ public class SharedUtils {
             contextFactory = MethodHandles.insertArguments(MH_MAKE_CONTEXT_BOUNDED_ALLOCATOR, 0, bufferCopySize);
         } else if (upcall) {
             contextFactory = MH_MAKE_CONTEXT_NO_ALLOCATOR;
-        } else {
+        } else if (needsScopeTracking) {
             // this path is probably never used now, since ProgrammableInvoker never calls this routine with bufferCopySize == 0
             contextFactory = MH_MAKE_CONTEXT_DEP_ALLOCATOR;
+        } else {
+            contextFactory = constant(Binding.Context.class, Binding.Context.DUMMY);
         }
 
         specializedHandle = tryFinally(specializedHandle, closer);

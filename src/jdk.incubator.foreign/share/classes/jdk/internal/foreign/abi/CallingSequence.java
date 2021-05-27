@@ -25,6 +25,7 @@
 package jdk.internal.foreign.abi;
 
 import jdk.incubator.foreign.FunctionDescriptor;
+import jdk.incubator.foreign.MemoryAddress;
 
 import java.lang.invoke.MethodType;
 import java.util.List;
@@ -92,5 +93,10 @@ public class CallingSequence {
 
     public boolean isTrivial() {
         return isTrivial;
+    }
+
+    public boolean needsScopeTracking() {
+        return !isTrivial &&
+                methodType().parameterList().stream().anyMatch(c -> c.equals(MemoryAddress.class));
     }
 }

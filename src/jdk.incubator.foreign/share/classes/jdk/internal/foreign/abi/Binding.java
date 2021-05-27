@@ -233,40 +233,97 @@ public abstract class Binding {
      * A binding context is used as an helper to carry out evaluation of certain bindings; for instance,
      * it helps {@link Allocate} bindings, by providing the {@link SegmentAllocator} that should be used for
      * the allocation operation, or {@link ToSegment} bindings, by providing the {@link ResourceScope} that
-     * should be used to create an unsafe struct from a memory address.
+     * should be used to create an unsafe struct from a memory address. Additionally, a context is used
+     * to keep track of which address scopes are seen in the context of a downcall method handle; such scopes
+     * are acquired before the native method call, and then released again once the native method call has
+     * completed. The implementation acts as an optimized linked list with multiple heads and a tail
+     * (another {@link Context}). In the common case where a native call receives arguments with less than
+     * 5 different explicit scopes, all the scope dependencies can be tracked inline, by an instance of this class.
      */
-    public static class Context implements AutoCloseable {
-        private final SegmentAllocator allocator;
-        private final ResourceScope scope;
+    static class Context implements AutoCloseable {
 
-        private Context(SegmentAllocator allocator, ResourceScope scope) {
-            this.allocator = allocator;
-            this.scope = scope;
+        ResourceScopeImpl scope1, scope2, scope3, scope4, scope5;
+        int size;
+        Context tail;
+
+        @SuppressWarnings("fallthrough")
+        public void close() {
+            switch (size) {
+                case 6: tail.close();
+                case 5: scope5.release();
+                case 4: scope4.release();
+                case 3: scope3.release();
+                case 2: scope2.release();
+                case 1: scope1.release();
+                case 0: break; // do nothing
+                default: throw unexpectedSize();
+            }
         }
 
-        public SegmentAllocator allocator() {
-            return allocator;
-        }
-
-        public ResourceScope scope() {
-            return scope;
+        private IllegalStateException unexpectedSize() {
+            throw new IllegalStateException("Unexpected dependency size: " + size);
         }
 
         public void addScopeDependency(ResourceScopeImpl scope) {
-            scope.addCloseDependency(scope());
+            if (!hasAcquired(scope)) {
+                switch (size) {
+                    case 0 -> { scope1 = scope; scope.acquire(); size++; }
+                    case 1 -> { scope2 = scope; scope.acquire(); size++; }
+                    case 2 -> { scope3 = scope; scope.acquire(); size++; }
+                    case 3 -> { scope4 = scope; scope.acquire(); size++; }
+                    case 4 -> { scope5 = scope; scope.acquire(); size++; }
+                    case 5 -> {
+                        tail = new Context();
+                        tail.addScopeDependency(scope);
+                        size++;
+                    }
+                    case 6 -> tail.addScopeDependency(scope);
+                    default -> throw unexpectedSize();
+                }
+            }
         }
 
-        @Override
-        public void close() {
-            scope().close();
+        @SuppressWarnings("fallthrough")
+        private boolean hasAcquired(ResourceScopeImpl scope) {
+            switch (size) {
+                case 6: if (tail.hasAcquired(scope)) return true;
+                case 5: if (scope5 == scope) return true;
+                case 4: if (scope4 == scope) return true;
+                case 3: if (scope3 == scope) return true;
+                case 2: if (scope2 == scope) return true;
+                case 1: if (scope1 == scope) return true;
+                case 0: return false;
+                default: throw unexpectedSize();
+            }
         }
+
+        public ResourceScope scope() {
+            throw new UnsupportedOperationException();
+        }
+
+        public SegmentAllocator allocator() { return SharedUtils.THROWING_ALLOCATOR; }
 
         /**
          * Create a binding context from given native scope.
          */
         public static Context ofBoundedAllocator(long size) {
-            ResourceScope scope = ResourceScope.newConfinedScope();
-            return new Context(SegmentAllocator.arenaAllocator(size, scope), scope);
+            var scope = ResourceScope.newConfinedScope();
+            var allocator = SegmentAllocator.arenaAllocator(size, scope);
+            return new Context() {
+                @Override
+                public SegmentAllocator allocator() {
+                    return allocator;
+                }
+                @Override
+                public ResourceScope scope() {
+                    return scope;
+                }
+                @Override
+                public void close() {
+                    super.close();
+                    scope.close();
+                }
+            };
         }
 
         /**
@@ -274,10 +331,10 @@ public abstract class Binding {
          * the context's scope is accessed.
          */
         public static Context ofAllocator(SegmentAllocator allocator) {
-            return new Context(allocator, null) {
+            return new Context() {
                 @Override
-                public ResourceScope scope() {
-                    throw new UnsupportedOperationException();
+                public SegmentAllocator allocator() {
+                    return allocator;
                 }
             };
         }
@@ -288,9 +345,16 @@ public abstract class Binding {
          */
         public static Context ofScope() {
             ResourceScope scope = ResourceScope.newConfinedScope();
-            return new Context(null, scope) {
+            return new Context() {
                 @Override
-                public SegmentAllocator allocator() { throw new UnsupportedOperationException(); }
+                public ResourceScope scope() {
+                    return scope;
+                }
+                @Override
+                public void close() {
+                    super.close();
+                    scope.close();
+                }
             };
         }
 
@@ -299,22 +363,17 @@ public abstract class Binding {
          * the context's allocator is accessed.
          */
         public static Context ofDependencyScope() {
-            return new ConfinedDependencyScope();
+            return new Context();
         }
 
         /**
          * Dummy binding context. Throws exceptions when attempting to access scope, return a throwing allocator, and has
          * an idempotent {@link #close()}.
          */
-        public static Context DUMMY = new Context(null, null) {
+        public static final Context DUMMY = new Context() {
             @Override
-            public SegmentAllocator allocator() {
-                return SharedUtils.THROWING_ALLOCATOR;
-            }
-
-            @Override
-            public ResourceScope scope() {
-                throw new UnsupportedOperationException();
+            public void addScopeDependency(ResourceScopeImpl scope) {
+                // do nothing
             }
 
             @Override
@@ -322,56 +381,6 @@ public abstract class Binding {
                 // do nothing
             }
         };
-    }
-
-    static class ConfinedDependencyScope extends Binding.Context {
-
-        public ConfinedDependencyScope() {
-            super(null, null);
-        }
-
-        ResourceScopeImpl scope1, scope2, scope3, scope4, scope5;
-        int size;
-
-        @Override
-        @SuppressWarnings("fallthrough")
-        public void close() {
-            switch (size) {
-                case 5: scope5.release();
-                case 4: scope4.release();
-                case 3: scope3.release();
-                case 2: scope2.release();
-                case 1: scope1.release();
-            }
-        }
-
-        @Override
-        public void addScopeDependency(ResourceScopeImpl scope) {
-            if (!hasAcquired(scope)) {
-                switch (size) {
-                    case 0 -> scope1 = scope;
-                    case 1 -> scope2 = scope;
-                    case 2 -> scope3 = scope;
-                    case 3 -> scope4 = scope;
-                    case 4 -> scope5 = scope;
-                    default -> throw new UnsupportedOperationException();
-                }
-                scope.acquire();
-                size++;
-            }
-        }
-
-        @SuppressWarnings("fallthrough")
-        private boolean hasAcquired(ResourceScopeImpl scope) {
-            switch (size) {
-                case 5: if (scope5 == scope) return true;
-                case 4: if (scope4 == scope) return true;
-                case 3: if (scope3 == scope) return true;
-                case 2: if (scope2 == scope) return true;
-                case 1: if (scope1 == scope) return true;
-                default: return false;
-            }
-        }
     }
 
     enum Tag {
@@ -1068,7 +1077,7 @@ public abstract class Binding {
         }
 
         private static MemorySegment toSegment(MemoryAddress operand, long size, Context context) {
-            return MemoryAddressImpl.ofLongUnchecked(operand.toRawLongValue(), size, (ResourceScopeImpl) context.scope);
+            return MemoryAddressImpl.ofLongUnchecked(operand.toRawLongValue(), size, (ResourceScopeImpl) context.scope());
         }
 
         @Override
