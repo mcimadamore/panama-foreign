@@ -100,6 +100,22 @@ public abstract class ResourceScopeImpl implements ResourceScope, ScopedMemoryAc
     }
 
     @Override
+    public final void addCloseDependency(ResourceScope scope) {
+        checkValidStateSlow();
+        acquire();
+        ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {
+            @Override
+            public void cleanup() {
+                ResourceScopeImpl.this.release();
+            }
+        }, true);
+    }
+
+    abstract void acquire();
+
+    abstract void release();
+
+    @Override
     public final void addCloseAction(Runnable runnable) {
         Objects.requireNonNull(runnable);
         addInternal(ResourceList.Node.ofRunnable(runnable), false);

@@ -317,7 +317,7 @@ public class ProgrammableInvoker {
                                 Map<VMStorage, Integer> retIndexMap) throws Throwable {
         Binding.Context unboxContext = bufferCopySize != 0
                 ? Binding.Context.ofBoundedAllocator(bufferCopySize)
-                : Binding.Context.DUMMY;
+                : Binding.Context.ofDependencyScope();
         try (unboxContext) {
             // do argument processing, get Object[] as result
             Object[] leafArgs = new Object[leaf.type().parameterCount()];

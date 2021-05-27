@@ -56,6 +56,7 @@ public class CallOverheadHelper {
     static Addressable identity_struct_addr;
     static final MethodHandle identity_memory_address;
     static final MethodHandle identity_memory_address_v;
+    static final MethodHandle identity_memory_address_3;
     static Addressable identity_memory_address_addr;
     static final MethodHandle args1;
     static final MethodHandle args1_v;
@@ -122,6 +123,11 @@ public class CallOverheadHelper {
                 MethodType.methodType(MemoryAddress.class, MemoryAddress.class),
                 FunctionDescriptor.of(C_POINTER, C_POINTER));
         identity_memory_address = insertArguments(identity_memory_address_v, 0, identity_memory_address_addr);
+
+        var identity_memory_address_addr = lookup.lookup("identity_memory_address_3").orElseThrow();
+        identity_memory_address_3 = abi.downcallHandle(identity_memory_address_addr,
+                MethodType.methodType(MemoryAddress.class, MemoryAddress.class, MemoryAddress.class, MemoryAddress.class),
+                FunctionDescriptor.of(C_POINTER, C_POINTER, C_POINTER, C_POINTER));
 
         args1_addr = lookup.lookup("args1").orElseThrow();
         args1_v = abi.downcallHandle(

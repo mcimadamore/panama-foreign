@@ -46,6 +46,10 @@ EXPORT void* identity_memory_address(void* p) {
     return p;
 }
 
+EXPORT void* identity_memory_address_3(void* p1, void* p2, void* p3) {
+    return p1;
+}
+
 EXPORT void args1(long long a0) {}
 EXPORT void args2(long long a0, double a1) {}
 EXPORT void args3(long long a0, double a1, long long a2) {}

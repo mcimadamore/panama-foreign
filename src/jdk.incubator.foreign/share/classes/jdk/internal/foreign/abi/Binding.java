@@ -30,6 +30,7 @@ import jdk.incubator.foreign.MemoryLayout;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.SegmentAllocator;
+import jdk.internal.foreign.ConfinedDependencyScope;
 import jdk.internal.foreign.MemoryAddressImpl;
 import jdk.internal.foreign.ResourceScopeImpl;
 
@@ -212,8 +213,8 @@ public abstract class Binding {
     static {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
-            MH_UNBOX_ADDRESS = lookup.findVirtual(MemoryAddress.class, "toRawLongValue",
-                    methodType(long.class));
+            MH_UNBOX_ADDRESS = lookup.findStatic(UnboxAddress.class, "unbox",
+                    methodType(long.class, MemoryAddress.class, Binding.Context.class));
             MH_BOX_ADDRESS = lookup.findStatic(MemoryAddress.class, "ofLong",
                     methodType(MemoryAddress.class, long.class));
             MH_BASE_ADDRESS = lookup.findVirtual(MemorySegment.class, "address",
@@ -252,6 +253,10 @@ public abstract class Binding {
             return scope;
         }
 
+        public void addScopeDependency(ResourceScope scope) {
+            scope.addCloseDependency(scope());
+        }
+
         @Override
         public void close() {
             scope().close();
@@ -287,6 +292,23 @@ public abstract class Binding {
             return new Context(null, scope) {
                 @Override
                 public SegmentAllocator allocator() { throw new UnsupportedOperationException(); }
+            };
+        }
+
+        /**
+         * Create a binding context from given scope. The resulting context will throw when
+         * the context's allocator is accessed.
+         */
+        public static Context ofDependencyScope() {
+            ConfinedDependencyScope scope = new ConfinedDependencyScope();
+            return new Context(null, scope) {
+                @Override
+                public SegmentAllocator allocator() { throw new UnsupportedOperationException(); }
+
+                @Override
+                public void addScopeDependency(ResourceScope that) {
+                    ((ConfinedDependencyScope)scope()).registerScopeIfNeeded((ResourceScopeImpl)that);
+                }
             };
         }
 
@@ -890,12 +912,29 @@ public abstract class Binding {
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
                               BindingInterpreter.LoadFunc loadFunc, Context context) {
-            stack.push(((MemoryAddress)stack.pop()).toRawLongValue());
+            stack.push(unbox((MemoryAddress)stack.pop(), context));
         }
 
         @Override
         public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
-            return filterArguments(specializedHandle, insertPos, MH_UNBOX_ADDRESS);
+            if (allocatorPos != -1) {
+                specializedHandle = collectArguments(specializedHandle, insertPos, MH_UNBOX_ADDRESS);
+                specializedHandle = SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos + 1);
+                return specializedHandle;
+            } else {
+                return collectArguments(specializedHandle, insertPos, MethodHandles.insertArguments(MH_UNBOX_ADDRESS, 1, new Object[] { null }));
+            }
+        }
+
+        static long unbox(MemoryAddress ma, Context ctx) {
+            if (ctx != null) {
+                ctx.addScopeDependency(ma.scope());
+            } else {
+                if (ma.scope() != ResourceScope.globalScope()) {
+                    throw new UnsupportedOperationException("Cannot return address not in the global scope");
+                }
+            }
+            return ma.toRawLongValue();
         }
 
         @Override

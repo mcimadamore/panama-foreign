@@ -72,18 +72,6 @@ public class ConfinedScope extends ResourceScopeImpl {
     }
 
     @Override
-    public void addCloseDependency(ResourceScope scope) {
-        checkValidState();
-        acquire();
-        ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {
-            @Override
-            public void cleanup() {
-                ConfinedScope.this.release();
-            }
-        }, true);
-    }
-
-    @Override
     public void checkValidState() {
         if (ownerThread != Thread.currentThread()) {
             throw new IllegalStateException("Attempted access outside owning thread");
@@ -93,11 +81,12 @@ public class ConfinedScope extends ResourceScopeImpl {
         }
     }
 
-    private void acquire() {
+    void acquire() {
+        checkValidState();
         lockCount++;
     }
 
-    private void release() {
+    void release() {
         lockCount--;
     }
 }

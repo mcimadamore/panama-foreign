@@ -95,17 +95,7 @@ public class SharedScope extends ResourceScopeImpl {
     }
 
     @Override
-    public void addCloseDependency(ResourceScope scope) {
-        acquire();
-        ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {
-            @Override
-            public void cleanup() {
-                SharedScope.this.release();
-            }
-        }, true);
-    }
-
-    private void acquire() {
+    void acquire() {
         int value;
         do {
             value = (int) STATE.getVolatile(this);
@@ -139,6 +129,7 @@ public class SharedScope extends ResourceScopeImpl {
         return (int) STATE.getVolatile(this) != CLOSED;
     }
 
+    @Override
     void release() {
         int value;
         do {

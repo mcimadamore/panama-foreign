@@ -102,6 +102,8 @@ public class TestUpcall extends CallGeneratorHelper {
             if (ret == Ret.NON_VOID) {
                 returnChecks.forEach(c -> c.accept(res));
             }
+        } catch (Throwable ex) {
+            System.err.println();
         }
     }
 

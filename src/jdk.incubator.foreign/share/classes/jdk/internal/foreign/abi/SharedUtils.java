@@ -76,6 +76,7 @@ public class SharedUtils {
     private static final MethodHandle MH_BASEADDRESS;
     private static final MethodHandle MH_BUFFER_COPY;
     private static final MethodHandle MH_MAKE_CONTEXT_NO_ALLOCATOR;
+    private static final MethodHandle MH_MAKE_CONTEXT_DEP_ALLOCATOR;
     private static final MethodHandle MH_MAKE_CONTEXT_BOUNDED_ALLOCATOR;
     private static final MethodHandle MH_CLOSE_CONTEXT;
     private static final MethodHandle MH_REACHBILITY_FENCE;
@@ -90,6 +91,8 @@ public class SharedUtils {
             MH_BUFFER_COPY = lookup.findStatic(SharedUtils.class, "bufferCopy",
                     methodType(MemoryAddress.class, MemoryAddress.class, MemorySegment.class));
             MH_MAKE_CONTEXT_NO_ALLOCATOR = lookup.findStatic(Binding.Context.class, "ofScope",
+                    methodType(Binding.Context.class));
+            MH_MAKE_CONTEXT_DEP_ALLOCATOR = lookup.findStatic(Binding.Context.class, "ofDependencyScope",
                     methodType(Binding.Context.class));
             MH_MAKE_CONTEXT_BOUNDED_ALLOCATOR = lookup.findStatic(Binding.Context.class, "ofBoundedAllocator",
                     methodType(Binding.Context.class, long.class));
@@ -382,19 +385,19 @@ public class SharedUtils {
 
         closer = collectArguments(closer, insertPos++, MH_CLOSE_CONTEXT); // (Throwable, V?, Addressable?, BindingContext) -> V/void
 
-        if (!upcall) {
-            // now for each Addressable parameter, add a reachability fence
-            MethodType specType = specializedHandle.type();
-            // skip 3 for address, segment allocator, and binding context
-            for (int i = 3; i < specType.parameterCount(); i++) {
-                Class<?> param = specType.parameterType(i);
-                if (Addressable.class.isAssignableFrom(param)) {
-                    closer = collectArguments(closer, insertPos++, reachabilityFenceHandle(param));
-                } else {
-                    closer = dropArguments(closer, insertPos++, param);
-                }
-            }
-        }
+//        if (!upcall) {
+//            // now for each Addressable parameter, add a reachability fence
+//            MethodType specType = specializedHandle.type();
+//            // skip 3 for address, segment allocator, and binding context
+//            for (int i = 3; i < specType.parameterCount(); i++) {
+//                Class<?> param = specType.parameterType(i);
+//                if (Addressable.class.isAssignableFrom(param)) {
+//                    closer = collectArguments(closer, insertPos++, reachabilityFenceHandle(param));
+//                } else {
+//                    closer = dropArguments(closer, insertPos++, param);
+//                }
+//            }
+//        }
 
         MethodHandle contextFactory;
 
@@ -404,7 +407,7 @@ public class SharedUtils {
             contextFactory = MH_MAKE_CONTEXT_NO_ALLOCATOR;
         } else {
             // this path is probably never used now, since ProgrammableInvoker never calls this routine with bufferCopySize == 0
-            contextFactory = constant(Binding.Context.class, Binding.Context.DUMMY);
+            contextFactory = MH_MAKE_CONTEXT_DEP_ALLOCATOR;
         }
 
         specializedHandle = tryFinally(specializedHandle, closer);

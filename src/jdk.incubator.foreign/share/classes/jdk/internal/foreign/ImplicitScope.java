@@ -65,17 +65,17 @@ public class ImplicitScope extends ResourceScopeImpl {
     }
 
     @Override
-    public void addCloseDependency(ResourceScope scope) {
-        ((ResourceScopeImpl)scope).addInternal(new ResourceList.Node() {
-            @Override
-            public void cleanup() {
-                Reference.reachabilityFence(this);
-            }
-        }, true);
+    public void checkValidState() {
+        // do nothing
     }
 
     @Override
-    public void checkValidState() {
+    void acquire() {
         // do nothing
+    }
+
+    @Override
+    void release() {
+        Reference.reachabilityFence(this);
     }
 }
