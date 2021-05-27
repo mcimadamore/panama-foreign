@@ -213,7 +213,7 @@ public abstract class Binding {
         try {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
             MH_UNBOX_ADDRESS = lookup.findStatic(UnboxAddress.class, "unbox",
-                    methodType(long.class, MemoryAddress.class, Binding.Context.class));
+                    methodType(long.class, MemoryAddress.class, CallingSequence.SafetyLevel.class, Binding.Context.class));
             MH_BOX_ADDRESS = lookup.findStatic(MemoryAddress.class, "ofLong",
                     methodType(MemoryAddress.class, long.class));
             MH_BASE_ADDRESS = lookup.findVirtual(MemorySegment.class, "address",
@@ -373,7 +373,7 @@ public abstract class Binding {
         public static final Context DUMMY = new Context() {
             @Override
             public void addScopeDependency(ResourceScopeImpl scope) {
-                // do nothing
+                throw new UnsupportedOperationException();
             }
 
             @Override
@@ -410,9 +410,9 @@ public abstract class Binding {
     public abstract void verify(Deque<Class<?>> stack);
 
     public abstract void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                                   BindingInterpreter.LoadFunc loadFunc, Context context);
+                                   BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context);
 
-    public abstract MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos);
+    public abstract MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel);
 
     private static void checkType(Class<?> type) {
         if (!type.isPrimitive() || type == void.class || type == boolean.class)
@@ -611,12 +611,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             storeFunc.store(storage(), type(), stack.pop());
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             return specializedHandle; // no-op
         }
 
@@ -646,12 +646,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             stack.push(loadFunc.load(storage(), type()));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             return specializedHandle; // no-op
         }
 
@@ -726,7 +726,7 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             Object value = stack.pop();
             MemorySegment operand = (MemorySegment) stack.pop();
             MemorySegment writeAddress = operand.asSlice(offset());
@@ -734,7 +734,7 @@ public abstract class Binding {
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             MethodHandle setter = varHandle().toMethodHandle(VarHandle.AccessMode.SET);
             setter = setter.asType(methodType(void.class, MemorySegment.class, type()));
             return collectArguments(specializedHandle, insertPos + 1, setter);
@@ -770,14 +770,14 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             MemorySegment operand = (MemorySegment) stack.pop();
             MemorySegment readAddress = operand.asSlice(offset());
             stack.push(SharedUtils.read(readAddress, type()));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             MethodHandle filter = varHandle()
                     .toMethodHandle(VarHandle.AccessMode.GET)
                     .asType(methodType(type(), MemorySegment.class));
@@ -842,14 +842,14 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             MemorySegment operand = (MemorySegment) stack.pop();
             MemorySegment copy = copyBuffer(operand, size, alignment, context);
             stack.push(copy);
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             MethodHandle filter = insertArguments(MH_COPY_BUFFER, 1, size, alignment);
             specializedHandle = collectArguments(specializedHandle, insertPos, filter);
             return SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos + 1);
@@ -913,12 +913,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             stack.push(allocateBuffer(size, alignment, context));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             MethodHandle allocateBuffer = insertArguments(MH_ALLOCATE_BUFFER, 0, size, alignment);
             specializedHandle = collectArguments(specializedHandle, insertPos, allocateBuffer);
             return SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos);
@@ -960,25 +960,27 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
-            stack.push(unbox((MemoryAddress)stack.pop(), context));
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
+            stack.push(unbox((MemoryAddress)stack.pop(), safetyLevel, context));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             if (allocatorPos != -1) {
-                specializedHandle = collectArguments(specializedHandle, insertPos, MH_UNBOX_ADDRESS);
+                specializedHandle = collectArguments(specializedHandle, insertPos, insertArguments(MH_UNBOX_ADDRESS, 1, safetyLevel));
                 specializedHandle = SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos + 1);
                 return specializedHandle;
             } else {
-                return collectArguments(specializedHandle, insertPos, MethodHandles.insertArguments(MH_UNBOX_ADDRESS, 1, new Object[] { null }));
+                return collectArguments(specializedHandle, insertPos, insertArguments(MH_UNBOX_ADDRESS, 1, safetyLevel, null));
             }
         }
 
-        static long unbox(MemoryAddress ma, Context ctx) {
+        static long unbox(MemoryAddress ma, CallingSequence.SafetyLevel safetyLevel, Context ctx) {
             if (ctx == null) {
-                if (ma.scope() != ResourceScope.globalScope()) {
+                if (ma.scope() != ResourceScope.globalScope() && safetyLevel == CallingSequence.SafetyLevel.DEFAULT) {
                     throw new UnsupportedOperationException("Cannot return address not in the global scope");
+                } else {
+                    ma.toRawLongValue();
                 }
             } else if (!ma.scope().isImplicit()) {
                 ctx.addScopeDependency((ResourceScopeImpl)ma.scope());
@@ -1012,12 +1014,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             stack.push(MemoryAddress.ofLong((long) stack.pop()));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             return filterArguments(specializedHandle, insertPos, MH_BOX_ADDRESS);
         }
 
@@ -1047,12 +1049,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             stack.push(((MemorySegment) stack.pop()).address());
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             return filterArguments(specializedHandle, insertPos, MH_BASE_ADDRESS);
         }
 
@@ -1089,14 +1091,14 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             MemoryAddress operand = (MemoryAddress) stack.pop();
             MemorySegment segment = toSegment(operand, size, context);
             stack.push(segment);
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             MethodHandle toSegmentHandle = insertArguments(MH_TO_SEGMENT, 1, size);
             specializedHandle = collectArguments(specializedHandle, insertPos, toSegmentHandle);
             return SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos + 1);
@@ -1142,7 +1144,7 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, CallingSequence.SafetyLevel safetyLevel, Context context) {
             stack.push(stack.peekLast());
         }
 
@@ -1165,7 +1167,7 @@ public abstract class Binding {
          *
          */
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, CallingSequence.SafetyLevel safetyLevel) {
             return SharedUtils.mergeArguments(specializedHandle, insertPos, insertPos + 1);
         }
 

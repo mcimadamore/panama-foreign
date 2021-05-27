@@ -103,7 +103,7 @@ public class SharedUtils {
             MH_REACHBILITY_FENCE = lookup.findStatic(Reference.class, "reachabilityFence",
                     methodType(void.class, Object.class));
             MH_CHECK_ADDRESS = lookup.findStatic(SharedUtils.class, "checkAddress",
-                    methodType(Addressable.class, Addressable.class, Binding.Context.class));
+                    methodType(Addressable.class, Addressable.class, CallingSequence.SafetyLevel.class, Binding.Context.class));
         } catch (ReflectiveOperationException e) {
             throw new BootstrapMethodError(e);
         }
@@ -368,7 +368,7 @@ public class SharedUtils {
 
     static MethodHandle wrapWithAllocator(MethodHandle specializedHandle,
                                           int allocatorPos, long bufferCopySize,
-                                          boolean upcall, boolean needsScopeTracking) {
+                                          boolean upcall, CallingSequence.SafetyLevel safetyLevel) {
         // insert try-finally to close the NativeScope used for Binding.Copy
         MethodHandle closer;
         int insertPos;
@@ -383,13 +383,17 @@ public class SharedUtils {
 
         // downcalls get the leading Addressable/SegmentAllocator param as well
         if (!upcall) {
-            closer = collectArguments(closer, insertPos++, reachabilityFenceHandle(Addressable.class));
+            if (safetyLevel.includes(CallingSequence.SafetyLevel.IMPLICIT_ONLY)) {
+                closer = collectArguments(closer, insertPos++, reachabilityFenceHandle(Addressable.class));
+            } else {
+                closer = dropArguments(closer, insertPos++, Addressable.class);
+            }
             closer = dropArguments(closer, insertPos++, SegmentAllocator.class); // (Throwable, V?, Addressable, SegmentAllocator) -> V/void
         }
 
         closer = collectArguments(closer, insertPos++, MH_CLOSE_CONTEXT); // (Throwable, V?, Addressable?, BindingContext) -> V/void
 
-        if (!upcall) {
+        if (!upcall && safetyLevel.includes(CallingSequence.SafetyLevel.IMPLICIT_ONLY)) {
             // now for each Addressable parameter, add a reachability fence
             MethodType specType = specializedHandle.type();
             // skip 3 for address, segment allocator, and binding context
@@ -409,7 +413,7 @@ public class SharedUtils {
             contextFactory = MethodHandles.insertArguments(MH_MAKE_CONTEXT_BOUNDED_ALLOCATOR, 0, bufferCopySize);
         } else if (upcall) {
             contextFactory = MH_MAKE_CONTEXT_NO_ALLOCATOR;
-        } else if (needsScopeTracking) {
+        } else if (safetyLevel == CallingSequence.SafetyLevel.DEFAULT) {
             // this path is probably never used now, since ProgrammableInvoker never calls this routine with bufferCopySize == 0
             contextFactory = MH_MAKE_CONTEXT_DEP_ALLOCATOR;
         } else {
@@ -672,9 +676,9 @@ public class SharedUtils {
         }
     }
 
-    static Addressable checkAddress(Addressable addressable, Binding.Context context) {
+    static Addressable checkAddress(Addressable addressable, CallingSequence.SafetyLevel safetyLevel, Binding.Context context) {
         var scope = addressable.address().scope();
-        if (!scope.isImplicit()) {
+        if (!scope.isImplicit() && safetyLevel == CallingSequence.SafetyLevel.DEFAULT) {
             context.addScopeDependency((ResourceScopeImpl) addressable.address().scope());
         }
         return addressable;

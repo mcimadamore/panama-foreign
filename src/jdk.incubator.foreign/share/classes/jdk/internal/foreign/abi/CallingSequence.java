@@ -29,6 +29,7 @@ import jdk.incubator.foreign.MemoryAddress;
 
 import java.lang.invoke.MethodType;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -95,8 +96,23 @@ public class CallingSequence {
         return isTrivial;
     }
 
-    public boolean needsScopeTracking() {
-        return !isTrivial &&
-                methodType().parameterList().stream().anyMatch(c -> c.equals(MemoryAddress.class));
+    public enum SafetyLevel {
+        DEFAULT,
+        IMPLICIT_ONLY,
+        TRIVIAL;
+
+        boolean includes(SafetyLevel other) {
+            return this.ordinal() >= other.ordinal();
+        }
+    }
+
+    SafetyLevel safetyLevel() {
+        if (isTrivial) {
+            return SafetyLevel.TRIVIAL;
+        } else if (methodType().parameterList().stream().noneMatch(c -> c.equals(MemoryAddress.class))) {
+            return SafetyLevel.IMPLICIT_ONLY;
+        } else {
+            return SafetyLevel.DEFAULT;
+        }
     }
 }

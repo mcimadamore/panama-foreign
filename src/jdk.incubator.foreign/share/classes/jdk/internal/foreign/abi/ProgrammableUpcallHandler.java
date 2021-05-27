@@ -28,8 +28,6 @@ package jdk.internal.foreign.abi;
 import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
-import jdk.incubator.foreign.ResourceScope;
-import jdk.incubator.foreign.SegmentAllocator;
 import jdk.internal.access.JavaLangInvokeAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.foreign.MemoryAddressImpl;
@@ -165,6 +163,7 @@ public class ProgrammableUpcallHandler {
                                                          Class<?> llReturn, long bufferCopySize) {
         MethodType highLevelType = callingSequence.methodType();
 
+        CallingSequence.SafetyLevel safetyLevel = callingSequence.safetyLevel();
         MethodHandle specializedHandle = target; // initial
 
         int argAllocatorPos = 0;
@@ -179,7 +178,7 @@ public class ProgrammableUpcallHandler {
             List<Binding> bindings = callingSequence.argumentBindings(i);
             for (int j = bindings.size() - 1; j >= 0; j--) {
                 Binding binding = bindings.get(j);
-                filter = binding.specialize(filter, filterInsertPos, filterAllocatorPos);
+                filter = binding.specialize(filter, filterInsertPos, filterAllocatorPos, safetyLevel);
             }
             specializedHandle = MethodHandles.collectArguments(specializedHandle, argInsertPos, filter);
             specializedHandle = mergeArguments(specializedHandle, argAllocatorPos, argInsertPos + filterAllocatorPos);
@@ -193,13 +192,13 @@ public class ProgrammableUpcallHandler {
             List<Binding> bindings = callingSequence.returnBindings();
             for (int j = bindings.size() - 1; j >= 0; j--) {
                 Binding binding = bindings.get(j);
-                filter = binding.specialize(filter, retInsertPos, retAllocatorPos);
+                filter = binding.specialize(filter, retInsertPos, retAllocatorPos, safetyLevel);
             }
             specializedHandle = filterReturnValue(specializedHandle, filter);
         }
 
         specializedHandle = SharedUtils.wrapWithAllocator(specializedHandle, argAllocatorPos, bufferCopySize,
-                true, callingSequence.needsScopeTracking());
+                true, safetyLevel);
 
         return specializedHandle;
     }
@@ -262,12 +261,13 @@ public class ProgrammableUpcallHandler {
         Binding.Context allocator = bufferCopySize != 0
                 ? Binding.Context.ofBoundedAllocator(bufferCopySize)
                 : Binding.Context.ofScope();
+        CallingSequence.SafetyLevel safetyLevel = callingSequence.safetyLevel();
         try (allocator) {
             /// Invoke interpreter, got array of high-level arguments back
             Object[] args = new Object[callingSequence.methodType().parameterCount()];
             for (int i = 0; i < args.length; i++) {
                 args[i] = BindingInterpreter.box(callingSequence.argumentBindings(i),
-                        (storage, type) -> moves[argIndexMap.get(storage)], allocator);
+                        (storage, type) -> moves[argIndexMap.get(storage)], safetyLevel, allocator);
             }
 
             if (DEBUG) {
@@ -286,7 +286,7 @@ public class ProgrammableUpcallHandler {
             Object[] returnMoves = new Object[retIndexMap.size()];
             if (leaf.type().returnType() != void.class) {
                 BindingInterpreter.unbox(o, callingSequence.returnBindings(),
-                        (storage, type, value) -> returnMoves[retIndexMap.get(storage)] = value, null);
+                        (storage, type, value) -> returnMoves[retIndexMap.get(storage)] = value, safetyLevel, null);
             }
 
             if (returnMoves.length == 0) {
