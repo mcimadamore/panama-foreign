@@ -982,7 +982,7 @@ public abstract class Binding {
                 } else {
                     ma.toRawLongValue();
                 }
-            } else if (!ma.scope().isImplicit()) {
+            } else if (!ma.scope().isImplicit() && safetyLevel == CallingSequence.SafetyLevel.DEFAULT) {
                 ctx.addScopeDependency((ResourceScopeImpl)ma.scope());
             }
             return ma.toRawLongValue();

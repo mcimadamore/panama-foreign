@@ -34,8 +34,8 @@ EXPORT int identity(int x) {
 }
 
 typedef struct {
-    long long x;
-    long long y;
+    int x;
+    int y;
 } Point;
 
 EXPORT Point identity_struct(Point p) {

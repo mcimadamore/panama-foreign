@@ -116,7 +116,7 @@ public class CallArranger {
                     List.of(vmStore(rax, long.class)));
         }
 
-        csb.setTrivial(SharedUtils.isTrivial(cDesc));
+        csb.setSafetyLevel(SharedUtils.safetyLevel(cDesc));
 
         return new Bindings(csb.build(), returnInMemory, argCalc.storageCalculator.nVectorReg);
     }

@@ -36,16 +36,16 @@ import java.util.stream.Stream;
 public class CallingSequence {
     private final MethodType mt;
     private final FunctionDescriptor desc;
-    private final boolean isTrivial;
+    private final SafetyLevel safetyLevel;
 
     private final List<Binding> returnBindings;
     private final List<List<Binding>> argumentBindings;
 
     public CallingSequence(MethodType mt, FunctionDescriptor desc,
-                           boolean isTrivial, List<List<Binding>> argumentBindings, List<Binding> returnBindings) {
+                           SafetyLevel safetyLevel, List<List<Binding>> argumentBindings, List<Binding> returnBindings) {
         this.mt = mt;
         this.desc = desc;
-        this.isTrivial = isTrivial;
+        this.safetyLevel = safetyLevel;
         this.returnBindings = returnBindings;
         this.argumentBindings = argumentBindings;
     }
@@ -93,7 +93,7 @@ public class CallingSequence {
     }
 
     public boolean isTrivial() {
-        return isTrivial;
+        return safetyLevel == SafetyLevel.TRIVIAL;
     }
 
     public enum SafetyLevel {
@@ -107,12 +107,12 @@ public class CallingSequence {
     }
 
     SafetyLevel safetyLevel() {
-        if (isTrivial) {
+        if (isTrivial()) {
             return SafetyLevel.TRIVIAL;
         } else if (methodType().parameterList().stream().noneMatch(c -> c.equals(MemoryAddress.class))) {
             return SafetyLevel.IMPLICIT_ONLY;
         } else {
-            return SafetyLevel.DEFAULT;
+            return safetyLevel;
         }
     }
 }

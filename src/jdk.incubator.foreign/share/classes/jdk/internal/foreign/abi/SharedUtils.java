@@ -528,10 +528,18 @@ public class SharedUtils {
         }
     }
 
-    public static boolean isTrivial(FunctionDescriptor cDesc) {
-        return cDesc.attribute(FunctionDescriptor.TRIVIAL_ATTRIBUTE_NAME)
+    public static CallingSequence.SafetyLevel safetyLevel(FunctionDescriptor cDesc) {
+        if (cDesc.attribute(FunctionDescriptor.TRIVIAL_ATTRIBUTE_NAME)
                 .map(Boolean.class::cast)
-                .orElse(false);
+                .orElse(false)) {
+            return CallingSequence.SafetyLevel.TRIVIAL;
+        } else if (cDesc.attribute(FunctionDescriptor.IMPLICIT_ATTRIBUTE_NAME)
+                .map(Boolean.class::cast)
+                .orElse(false)) {
+            return CallingSequence.SafetyLevel.IMPLICIT_ONLY;
+        } else {
+            return CallingSequence.SafetyLevel.DEFAULT;
+        }
     }
 
     public static class SimpleVaArg {

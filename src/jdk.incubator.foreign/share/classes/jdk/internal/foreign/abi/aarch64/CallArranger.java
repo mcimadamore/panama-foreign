@@ -119,7 +119,7 @@ public class CallArranger {
             csb.addArgumentBindings(carrier, layout, argCalc.getBindings(carrier, layout));
         }
 
-        csb.setTrivial(SharedUtils.isTrivial(cDesc));
+        csb.setSafetyLevel(SharedUtils.safetyLevel(cDesc));
 
         return new Bindings(csb.build(), returnInMemory);
     }

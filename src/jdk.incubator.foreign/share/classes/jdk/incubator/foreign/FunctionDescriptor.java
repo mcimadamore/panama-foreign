@@ -53,6 +53,7 @@ public final class FunctionDescriptor implements Constable {
      * attribute value must be a boolean.
      */
     public static final String TRIVIAL_ATTRIBUTE_NAME = "abi/trivial";
+    public static final String IMPLICIT_ATTRIBUTE_NAME = "abi/implicit";
 
     private final MemoryLayout resLayout;
     private final MemoryLayout[] argLayouts;
