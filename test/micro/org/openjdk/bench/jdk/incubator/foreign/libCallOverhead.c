@@ -42,6 +42,10 @@ EXPORT Point identity_struct(Point p) {
     return p;
 }
 
+EXPORT Point identity_struct_3(Point p1, Point p2, Point p3) {
+    return p1;
+}
+
 EXPORT void* identity_memory_address(void* p) {
     return p;
 }

@@ -66,8 +66,33 @@ public class CallOverheadVirtual {
     }
 
     @Benchmark
-    public MemorySegment panama_identity_struct() throws Throwable {
-        return (MemorySegment) identity_struct_v.invokeExact(identity_struct_addr, recycling_allocator, point);
+    public MemorySegment panama_identity_struct_confined() throws Throwable {
+        return (MemorySegment) identity_struct_v.invokeExact(identity_struct_addr, recycling_allocator, confinedPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_implicit() throws Throwable {
+        return (MemorySegment) identity_struct_v.invokeExact(identity_struct_addr, recycling_allocator, implicitPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_shared() throws Throwable {
+        return (MemorySegment) identity_struct_v.invokeExact(identity_struct_addr, recycling_allocator, sharedPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_confined_3() throws Throwable {
+        return (MemorySegment) identity_struct_v.invokeExact(identity_struct_addr, recycling_allocator, confinedPoint, confinedPoint, confinedPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_implicit_3() throws Throwable {
+        return (MemorySegment) identity_struct_v.invokeExact(identity_struct_addr, recycling_allocator, implicitPoint, implicitPoint, implicitPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_shared_3() throws Throwable {
+        return (MemorySegment) identity_struct_v.invokeExact(identity_struct_addr, recycling_allocator, sharedPoint, sharedPoint, sharedPoint);
     }
 
     @Benchmark

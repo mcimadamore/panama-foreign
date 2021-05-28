@@ -46,10 +46,6 @@ import static org.openjdk.bench.jdk.incubator.foreign.CallOverheadHelper.*;
 @Fork(value = 3, jvmArgsAppend = { "--add-modules=jdk.incubator.foreign", "--enable-native-access=ALL-UNNAMED" })
 public class CallOverheadConstant {
 
-    MemoryAddress implicitAddr = MemoryAddress.NULL.address().asSegment(10, ResourceScope.newImplicitScope()).address();
-    MemoryAddress sharedAddr = MemoryAddress.NULL.address().asSegment(10, ResourceScope.newSharedScope()).address();
-    MemoryAddress confinedAddr = MemoryAddress.NULL.address().asSegment(10, ResourceScope.newConfinedScope()).address();
-
     @Benchmark
     public void jni_blank() throws Throwable {
         blank();
@@ -71,8 +67,33 @@ public class CallOverheadConstant {
     }
 
     @Benchmark
-    public MemorySegment panama_identity_struct() throws Throwable {
-        return (MemorySegment) identity_struct.invokeExact(recycling_allocator, point);
+    public MemorySegment panama_identity_struct_confined() throws Throwable {
+        return (MemorySegment) identity_struct.invokeExact(recycling_allocator, confinedPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_implicit() throws Throwable {
+        return (MemorySegment) identity_struct.invokeExact(recycling_allocator, implicitPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_shared() throws Throwable {
+        return (MemorySegment) identity_struct.invokeExact(recycling_allocator, sharedPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_confined_3() throws Throwable {
+        return (MemorySegment) identity_struct_3.invokeExact(recycling_allocator, confinedPoint, confinedPoint, confinedPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_implicit_3() throws Throwable {
+        return (MemorySegment) identity_struct_3.invokeExact(recycling_allocator, implicitPoint, implicitPoint, implicitPoint);
+    }
+
+    @Benchmark
+    public MemorySegment panama_identity_struct_shared_3() throws Throwable {
+        return (MemorySegment) identity_struct_3.invokeExact(recycling_allocator, sharedPoint, sharedPoint, sharedPoint);
     }
 
     @Benchmark

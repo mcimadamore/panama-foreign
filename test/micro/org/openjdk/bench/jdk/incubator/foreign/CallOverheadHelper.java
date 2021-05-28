@@ -55,6 +55,9 @@ public class CallOverheadHelper {
     static final MethodHandle identity_struct;
     static final MethodHandle identity_struct_v;
     static Addressable identity_struct_addr;
+    static final MethodHandle identity_struct_3;
+    static final MethodHandle identity_struct_3_v;
+    static Addressable identity_struct_3_addr;
     static final MethodHandle identity_memory_address;
     static final MethodHandle identity_memory_address_v;
     static Addressable identity_memory_address_addr;
@@ -84,7 +87,13 @@ public class CallOverheadHelper {
             C_INT, C_INT
     );
 
-    static final MemorySegment point = MemorySegment.allocateNative(POINT_LAYOUT, ResourceScope.newImplicitScope());
+    static final MemorySegment implicitPoint = MemorySegment.allocateNative(POINT_LAYOUT, ResourceScope.newImplicitScope());
+    static final MemorySegment sharedPoint = MemorySegment.allocateNative(POINT_LAYOUT, ResourceScope.newSharedScope());
+    static final MemorySegment confinedPoint = MemorySegment.allocateNative(POINT_LAYOUT, ResourceScope.newConfinedScope());
+
+    static final MemoryAddress implicitAddr = MemoryAddress.NULL.address().asSegment(10, ResourceScope.newImplicitScope()).address();
+    static final MemoryAddress sharedAddr = MemoryAddress.NULL.address().asSegment(10, ResourceScope.newSharedScope()).address();
+    static final MemoryAddress confinedAddr = MemoryAddress.NULL.address().asSegment(10, ResourceScope.newConfinedScope()).address();
 
     static final SegmentAllocator recycling_allocator = SegmentAllocator.ofSegment(MemorySegment.allocateNative(POINT_LAYOUT, ResourceScope.newImplicitScope()));
 
@@ -112,6 +121,12 @@ public class CallOverheadHelper {
                 MethodType.methodType(MemorySegment.class, MemorySegment.class),
                 FunctionDescriptor.of(POINT_LAYOUT, POINT_LAYOUT));
         identity_struct = insertArguments(identity_struct_v, 0, identity_struct_addr);
+
+        identity_struct_3_addr = lookup.lookup("identity_struct_3").orElseThrow();
+        identity_struct_3_v = abi.downcallHandle(
+                MethodType.methodType(MemorySegment.class, MemorySegment.class, MemorySegment.class, MemorySegment.class),
+                FunctionDescriptor.of(POINT_LAYOUT, POINT_LAYOUT, POINT_LAYOUT, POINT_LAYOUT));
+        identity_struct_3 = insertArguments(identity_struct_3_v, 0, identity_struct_3_addr);
 
         identity_memory_address_addr = lookup.lookup("identity_memory_address").orElseThrow();
         identity_memory_address_v = abi.downcallHandle(
