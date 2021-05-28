@@ -122,10 +122,10 @@ public class CallArranger {
         return new Bindings(csb.build(), returnInMemory);
     }
 
-    public static MethodHandle arrangeDowncall(MethodType mt, FunctionDescriptor cDesc, int invMode) {
+    public static MethodHandle arrangeDowncall(MethodType mt, FunctionDescriptor cDesc, int characteristics) {
         Bindings bindings = getBindings(mt, cDesc, false);
 
-        MethodHandle handle = new ProgrammableInvoker(C, bindings.callingSequence, invMode).getBoundMethodHandle();
+        MethodHandle handle = new ProgrammableInvoker(C, bindings.callingSequence, characteristics).getBoundMethodHandle();
 
         if (bindings.isInMemoryReturn) {
             handle = SharedUtils.adaptDowncallForIMR(handle, cDesc);
@@ -134,14 +134,14 @@ public class CallArranger {
         return handle;
     }
 
-    public static UpcallHandler arrangeUpcall(MethodHandle target, MethodType mt, FunctionDescriptor cDesc, int invMode) {
+    public static UpcallHandler arrangeUpcall(MethodHandle target, MethodType mt, FunctionDescriptor cDesc, int characteristics) {
         Bindings bindings = getBindings(mt, cDesc, true);
 
         if (bindings.isInMemoryReturn) {
             target = SharedUtils.adaptUpcallForIMR(target, true /* drop return, since we don't have bindings for it */);
         }
 
-        return ProgrammableUpcallHandler.make(C, target, bindings.callingSequence, invMode);
+        return ProgrammableUpcallHandler.make(C, target, bindings.callingSequence, characteristics);
     }
 
     private static boolean isInMemoryReturn(Optional<MemoryLayout> returnLayout) {

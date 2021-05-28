@@ -272,11 +272,11 @@ public class SharedUtils {
         throw new IllegalArgumentException("No type for size: " + size + " isFloat=" + useFloat);
     }
 
-    public static CLinker getSystemLinker() {
+    public static CLinker getSystemLinker(int characteristics) {
         return switch (CABI.current()) {
-            case Win64 -> Windowsx64Linker.getInstance();
-            case SysV -> SysVx64Linker.getInstance();
-            case AArch64 -> AArch64Linker.getInstance();
+            case Win64 -> new Windowsx64Linker(characteristics);
+            case SysV -> new SysVx64Linker(characteristics);
+            case AArch64 -> new AArch64Linker(characteristics);
         };
     }
 
@@ -368,7 +368,7 @@ public class SharedUtils {
 
     static MethodHandle wrapWithAllocator(MethodHandle specializedHandle,
                                           int allocatorPos, long bufferCopySize,
-                                          boolean upcall, boolean hasAddressParameters, int invMode) {
+                                          boolean upcall, boolean hasAddressParameters, int characteristics) {
         // insert try-finally to close the NativeScope used for Binding.Copy
         MethodHandle closer;
         int insertPos;
@@ -383,7 +383,7 @@ public class SharedUtils {
 
         // downcalls get the leading Addressable/SegmentAllocator param as well
         if (!upcall) {
-            if ((invMode & CLinker.KEEP_IMPLICIT_SCOPES_ALIVE) != 0) {
+            if ((characteristics & CLinker.KEEP_IMPLICIT_SCOPES_ALIVE) != 0) {
                 closer = collectArguments(closer, insertPos++, reachabilityFenceHandle(Addressable.class));
             } else {
                 closer = dropArguments(closer, insertPos++, Addressable.class);
@@ -393,7 +393,7 @@ public class SharedUtils {
 
         closer = collectArguments(closer, insertPos++, MH_CLOSE_CONTEXT); // (Throwable, V?, Addressable?, BindingContext) -> V/void
 
-        if (!upcall && (invMode & CLinker.KEEP_IMPLICIT_SCOPES_ALIVE) != 0) {
+        if (!upcall && (characteristics & CLinker.KEEP_IMPLICIT_SCOPES_ALIVE) != 0) {
             // now for each Addressable parameter, add a reachability fence
             MethodType specType = specializedHandle.type();
             // skip 3 for address, segment allocator, and binding context
@@ -413,7 +413,7 @@ public class SharedUtils {
             contextFactory = MethodHandles.insertArguments(MH_MAKE_CONTEXT_BOUNDED_ALLOCATOR, 0, bufferCopySize);
         } else if (upcall) {
             contextFactory = MH_MAKE_CONTEXT_NO_ALLOCATOR;
-        } else if (hasAddressParameters && (invMode & CLinker.KEEP_EXPLICIT_SCOPES_ALIVE) != 0) {
+        } else if (hasAddressParameters && (characteristics & CLinker.KEEP_EXPLICIT_SCOPES_ALIVE) != 0) {
             // this path is probably never used now, since ProgrammableInvoker never calls this routine with bufferCopySize == 0
             contextFactory = MH_MAKE_CONTEXT_DEP_ALLOCATOR;
         } else {
@@ -428,7 +428,7 @@ public class SharedUtils {
     // lazy init MH_ALLOC and MH_FREE handles
     private static class AllocHolder {
 
-        private static final CLinker linker = getSystemLinker();
+        private static final CLinker linker = getSystemLinker(DEFAULT_CHARACTERISTICS); // TODO: maybe these can be treated as leafs?
 
         static final MethodHandle MH_MALLOC = linker.downcallHandle(CLinker.systemLookup().lookup("malloc").get(),
                         MethodType.methodType(MemoryAddress.class, long.class),
@@ -670,9 +670,9 @@ public class SharedUtils {
         }
     }
 
-    static Addressable checkAddress(Addressable addressable, int invMode, Binding.Context context) {
+    static Addressable checkAddress(Addressable addressable, int characteristics, Binding.Context context) {
         var scope = addressable.address().scope();
-        if (!scope.isImplicit() && (invMode & CLinker.KEEP_EXPLICIT_SCOPES_ALIVE) != 0) {
+        if (!scope.isImplicit() && (characteristics & CLinker.KEEP_EXPLICIT_SCOPES_ALIVE) != 0) {
             context.addScopeDependency((ResourceScopeImpl) addressable.address().scope());
         }
         return addressable;

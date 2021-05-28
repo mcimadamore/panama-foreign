@@ -52,6 +52,7 @@ import static org.testng.Assert.assertEquals;
 public class TestIntrinsics {
 
     static final CLinker abi = CLinker.getInstance();
+    static final CLinker abi_trivial = CLinker.getInstance(NO_STATE_TRANSITIONS);
     static {
         System.loadLibrary("Intrinsics");
     }
@@ -92,7 +93,7 @@ public class TestIntrinsics {
             FunctionDescriptor fd = FunctionDescriptor.of(layout, layout);
 
             tests.add(abi.downcallHandle(ma, mt, fd), arg, arg);
-            tests.add(abi.downcallHandle(mt, fd, NO_STATE_TRANSITIONS).bindTo(ma), arg, arg);
+            tests.add(abi_trivial.downcallHandle(ma, mt, fd), arg, arg);
             tests.add(abi.downcallHandle(mt, fd), arg, ma, arg);
         };
 
@@ -101,7 +102,7 @@ public class TestIntrinsics {
             MethodType mt = methodType(void.class);
             FunctionDescriptor fd = FunctionDescriptor.ofVoid();
             tests.add(abi.downcallHandle(ma, mt, fd), null);
-            tests.add(abi.downcallHandle(mt, fd, NO_STATE_TRANSITIONS).bindTo(ma), null);
+            tests.add(abi_trivial.downcallHandle(ma, mt, fd), null);
         }
 
         addIdentity.add("identity_char",   byte.class,   C_CHAR,   (byte) 10);
@@ -117,7 +118,7 @@ public class TestIntrinsics {
             FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_INT, asVarArg(C_DOUBLE),
                     asVarArg(C_INT), asVarArg(C_FLOAT), asVarArg(C_LONG_LONG));
             tests.add(abi.downcallHandle(ma, mt, fd), 1, 1, 10D, 2, 3F, 4L);
-            tests.add(abi.downcallHandle(mt, fd, NO_STATE_TRANSITIONS).bindTo(ma), 1, 1, 10D, 2, 3F, 4L);
+            tests.add(abi_trivial.downcallHandle(ma, mt, fd), 1, 1, 10D, 2, 3F, 4L);
         }
 
         { // high_arity
@@ -132,7 +133,7 @@ public class TestIntrinsics {
                 FunctionDescriptor fd = baseFD.withReturnLayout(baseFD.argumentLayouts().get(i));
                 Object expected = args[i];
                 tests.add(abi.downcallHandle(ma, mt, fd), expected, args);
-                tests.add(abi.downcallHandle(mt, fd, NO_STATE_TRANSITIONS).bindTo(ma), expected, args);
+                tests.add(abi_trivial.downcallHandle(ma, mt, fd), expected, args);
             }
         }
 

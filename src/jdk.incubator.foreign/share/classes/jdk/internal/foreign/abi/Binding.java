@@ -411,9 +411,9 @@ public abstract class Binding {
     public abstract void verify(Deque<Class<?>> stack);
 
     public abstract void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                                   BindingInterpreter.LoadFunc loadFunc, int invMode, Context context);
+                                   BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context);
 
-    public abstract MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode);
+    public abstract MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics);
 
     private static void checkType(Class<?> type) {
         if (!type.isPrimitive() || type == void.class || type == boolean.class)
@@ -612,12 +612,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             storeFunc.store(storage(), type(), stack.pop());
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             return specializedHandle; // no-op
         }
 
@@ -647,12 +647,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             stack.push(loadFunc.load(storage(), type()));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             return specializedHandle; // no-op
         }
 
@@ -727,7 +727,7 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             Object value = stack.pop();
             MemorySegment operand = (MemorySegment) stack.pop();
             MemorySegment writeAddress = operand.asSlice(offset());
@@ -735,7 +735,7 @@ public abstract class Binding {
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             MethodHandle setter = varHandle().toMethodHandle(VarHandle.AccessMode.SET);
             setter = setter.asType(methodType(void.class, MemorySegment.class, type()));
             return collectArguments(specializedHandle, insertPos + 1, setter);
@@ -771,14 +771,14 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             MemorySegment operand = (MemorySegment) stack.pop();
             MemorySegment readAddress = operand.asSlice(offset());
             stack.push(SharedUtils.read(readAddress, type()));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             MethodHandle filter = varHandle()
                     .toMethodHandle(VarHandle.AccessMode.GET)
                     .asType(methodType(type(), MemorySegment.class));
@@ -843,14 +843,14 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             MemorySegment operand = (MemorySegment) stack.pop();
             MemorySegment copy = copyBuffer(operand, size, alignment, context);
             stack.push(copy);
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             MethodHandle filter = insertArguments(MH_COPY_BUFFER, 1, size, alignment);
             specializedHandle = collectArguments(specializedHandle, insertPos, filter);
             return SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos + 1);
@@ -914,12 +914,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             stack.push(allocateBuffer(size, alignment, context));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             MethodHandle allocateBuffer = insertArguments(MH_ALLOCATE_BUFFER, 0, size, alignment);
             specializedHandle = collectArguments(specializedHandle, insertPos, allocateBuffer);
             return SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos);
@@ -961,27 +961,27 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
-            stack.push(unbox((MemoryAddress)stack.pop(), invMode, context));
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
+            stack.push(unbox((MemoryAddress)stack.pop(), characteristics, context));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             if (allocatorPos != -1) {
-                specializedHandle = collectArguments(specializedHandle, insertPos, insertArguments(MH_UNBOX_ADDRESS, 1, invMode));
+                specializedHandle = collectArguments(specializedHandle, insertPos, insertArguments(MH_UNBOX_ADDRESS, 1, characteristics));
                 specializedHandle = SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos + 1);
                 return specializedHandle;
             } else {
-                return collectArguments(specializedHandle, insertPos, insertArguments(MH_UNBOX_ADDRESS, 1, invMode, null));
+                return collectArguments(specializedHandle, insertPos, insertArguments(MH_UNBOX_ADDRESS, 1, characteristics, null));
             }
         }
 
-        static long unbox(MemoryAddress ma, int invMode, Context ctx) {
+        static long unbox(MemoryAddress ma, int characteristics, Context ctx) {
             if (ctx == null &&
-                    (invMode & CLinker.CHECK_UPCALL_RETURN_SCOPES) != 0 &&
+                    (characteristics & CLinker.CHECK_UPCALL_RETURN_SCOPES) != 0 &&
                     ma.scope() != ResourceScope.globalScope()) {
                 throw new UnsupportedOperationException("Cannot return address not in the global scope");
-            } else if (ctx != null && (invMode & CLinker.KEEP_EXPLICIT_SCOPES_ALIVE) != 0) {
+            } else if (ctx != null && (characteristics & CLinker.KEEP_EXPLICIT_SCOPES_ALIVE) != 0) {
                 ctx.addScopeDependency((ResourceScopeImpl) ma.scope());
             }
             return ma.toRawLongValue();
@@ -1013,12 +1013,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             stack.push(MemoryAddress.ofLong((long) stack.pop()));
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             return filterArguments(specializedHandle, insertPos, MH_BOX_ADDRESS);
         }
 
@@ -1048,12 +1048,12 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             stack.push(((MemorySegment) stack.pop()).address());
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             return filterArguments(specializedHandle, insertPos, MH_BASE_ADDRESS);
         }
 
@@ -1090,14 +1090,14 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             MemoryAddress operand = (MemoryAddress) stack.pop();
             MemorySegment segment = toSegment(operand, size, context);
             stack.push(segment);
         }
 
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             MethodHandle toSegmentHandle = insertArguments(MH_TO_SEGMENT, 1, size);
             specializedHandle = collectArguments(specializedHandle, insertPos, toSegmentHandle);
             return SharedUtils.mergeArguments(specializedHandle, allocatorPos, insertPos + 1);
@@ -1143,7 +1143,7 @@ public abstract class Binding {
 
         @Override
         public void interpret(Deque<Object> stack, BindingInterpreter.StoreFunc storeFunc,
-                              BindingInterpreter.LoadFunc loadFunc, int invMode, Context context) {
+                              BindingInterpreter.LoadFunc loadFunc, int characteristics, Context context) {
             stack.push(stack.peekLast());
         }
 
@@ -1166,7 +1166,7 @@ public abstract class Binding {
          *
          */
         @Override
-        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int invMode) {
+        public MethodHandle specialize(MethodHandle specializedHandle, int insertPos, int allocatorPos, int characteristics) {
             return SharedUtils.mergeArguments(specializedHandle, insertPos, insertPos + 1);
         }
 

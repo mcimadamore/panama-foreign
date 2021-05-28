@@ -28,9 +28,7 @@ package jdk.internal.foreign;
 import jdk.incubator.foreign.Addressable;
 import jdk.incubator.foreign.CLinker;
 import jdk.incubator.foreign.FunctionDescriptor;
-import jdk.incubator.foreign.MemoryAddress;
 import jdk.incubator.foreign.MemorySegment;
-import jdk.incubator.foreign.ResourceScope;
 import jdk.incubator.foreign.SegmentAllocator;
 import jdk.internal.foreign.abi.SharedUtils;
 import jdk.internal.reflect.CallerSensitive;
@@ -43,10 +41,10 @@ import java.util.Objects;
 
 public abstract class AbstractCLinker implements CLinker {
 
-    @CallerSensitive
-    public final MethodHandle downcallHandle(MethodType type, FunctionDescriptor function) {
-        Reflection.ensureNativeAccess(Reflection.getCallerClass());
-        return downcallHandle(type, function, DEFAULT_MODE);
+    protected final int characteristics;
+
+    protected AbstractCLinker(int characteristics) {
+        this.characteristics = characteristics;
     }
 
     @CallerSensitive
@@ -66,10 +64,5 @@ public abstract class AbstractCLinker implements CLinker {
             downcall = MethodHandles.insertArguments(downcall, 0, allocator);
         }
         return downcall;
-    }
-
-    @CallerSensitive
-    public MemoryAddress upcallStub(MethodHandle target, FunctionDescriptor function, ResourceScope scope) {
-        return upcallStub(target, function, scope, DEFAULT_MODE);
     }
 }

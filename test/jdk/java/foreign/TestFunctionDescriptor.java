@@ -32,10 +32,8 @@ import jdk.incubator.foreign.FunctionDescriptor;
 import jdk.incubator.foreign.MemoryLayout;
 import org.testng.annotations.Test;
 
-import java.lang.constant.Constable;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static jdk.incubator.foreign.CLinker.C_DOUBLE;
 import static jdk.incubator.foreign.CLinker.C_INT;
@@ -46,8 +44,6 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestFunctionDescriptor {
-
-    static final String DUMMY_ATTR = "dummy";
 
     @Test
     public void testOf() {
@@ -69,55 +65,34 @@ public class TestFunctionDescriptor {
     }
 
     @Test
-    public void testAttribute() {
-        FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_DOUBLE, C_LONG_LONG);
-        fd = fd.withAttribute(DUMMY_ATTR, true);
-
-        assertEquals(fd.argumentLayouts(), List.of(C_DOUBLE, C_LONG_LONG));
-        Optional<MemoryLayout> returnLayoutOp = fd.returnLayout();
-        assertTrue(returnLayoutOp.isPresent());
-        assertEquals(returnLayoutOp.get(), C_INT);
-        assertEquals(fd.attributes().collect(Collectors.toList()), List.of(DUMMY_ATTR));
-        Optional<Constable> attr = fd.attribute(DUMMY_ATTR);
-        assertTrue(attr.isPresent());
-        assertEquals(attr.get(), true);
-    }
-
-    @Test
     public void testAppendArgumentLayouts() {
-        FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_DOUBLE, C_LONG_LONG)
-                                                  .withAttribute(DUMMY_ATTR, true);
+        FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_DOUBLE, C_LONG_LONG);
         fd = fd.withAppendedArgumentLayouts(C_POINTER);
 
         assertEquals(fd.argumentLayouts(), List.of(C_DOUBLE, C_LONG_LONG, C_POINTER));
         Optional<MemoryLayout> returnLayoutOp = fd.returnLayout();
         assertTrue(returnLayoutOp.isPresent());
         assertEquals(returnLayoutOp.get(), C_INT);
-        assertEquals(fd.attributes().collect(Collectors.toList()), List.of(DUMMY_ATTR));
     }
 
     @Test
     public void testChangeReturnLayout() {
-        FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_DOUBLE, C_LONG_LONG)
-                                                  .withAttribute(DUMMY_ATTR, true);
+        FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_DOUBLE, C_LONG_LONG);
         fd = fd.withReturnLayout(C_INT);
 
         assertEquals(fd.argumentLayouts(), List.of(C_DOUBLE, C_LONG_LONG));
         Optional<MemoryLayout> returnLayoutOp = fd.returnLayout();
         assertTrue(returnLayoutOp.isPresent());
         assertEquals(returnLayoutOp.get(), C_INT);
-        assertEquals(fd.attributes().collect(Collectors.toList()), List.of(DUMMY_ATTR));
     }
 
     @Test
     public void testDropReturnLayout() {
-        FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_DOUBLE, C_LONG_LONG)
-                                                  .withAttribute(DUMMY_ATTR, true);
+        FunctionDescriptor fd = FunctionDescriptor.of(C_INT, C_DOUBLE, C_LONG_LONG);
         fd = fd.withVoidReturnLayout();
 
         assertEquals(fd.argumentLayouts(), List.of(C_DOUBLE, C_LONG_LONG));
         Optional<MemoryLayout> returnLayoutOp = fd.returnLayout();
         assertFalse(returnLayoutOp.isPresent());
-        assertEquals(fd.attributes().collect(Collectors.toList()), List.of(DUMMY_ATTR));
     }
 }

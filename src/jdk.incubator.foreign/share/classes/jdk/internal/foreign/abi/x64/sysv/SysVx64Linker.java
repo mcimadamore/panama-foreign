@@ -52,8 +52,6 @@ public final class SysVx64Linker extends AbstractCLinker {
     public static final int MAX_VECTOR_RETURN_REGISTERS = 2;
     public static final int MAX_X87_RETURN_REGISTERS = 2;
 
-    private static SysVx64Linker instance;
-
     static final long ADDRESS_SIZE = 64; // bits
 
     private static final MethodHandle MH_unboxVaList;
@@ -71,11 +69,8 @@ public final class SysVx64Linker extends AbstractCLinker {
         }
     }
 
-    public static SysVx64Linker getInstance() {
-        if (instance == null) {
-            instance = new SysVx64Linker();
-        }
-        return instance;
+    public SysVx64Linker(int characteristics) {
+        super(characteristics);
     }
 
     public static VaList newVaList(Consumer<VaList.Builder> actions, ResourceScope scope) {
@@ -86,12 +81,12 @@ public final class SysVx64Linker extends AbstractCLinker {
 
     @Override
     @CallerSensitive
-    public final MethodHandle downcallHandle(MethodType type, FunctionDescriptor function, int invMode) {
+    public final MethodHandle downcallHandle(MethodType type, FunctionDescriptor function) {
         Reflection.ensureNativeAccess(Reflection.getCallerClass());
         Objects.requireNonNull(type);
         Objects.requireNonNull(function);
         MethodType llMt = SharedUtils.convertVaListCarriers(type, SysVVaList.CARRIER);
-        MethodHandle handle = CallArranger.arrangeDowncall(llMt, function, invMode);
+        MethodHandle handle = CallArranger.arrangeDowncall(llMt, function, characteristics);
         if (!type.returnType().equals(MemorySegment.class)) {
             // not returning segment, just insert a throwing allocator
             handle = MethodHandles.insertArguments(handle, 1, SharedUtils.THROWING_ALLOCATOR);
@@ -102,13 +97,13 @@ public final class SysVx64Linker extends AbstractCLinker {
 
     @Override
     @CallerSensitive
-    public final MemoryAddress upcallStub(MethodHandle target, FunctionDescriptor function, ResourceScope scope, int invMode) {
+    public final MemoryAddress upcallStub(MethodHandle target, FunctionDescriptor function, ResourceScope scope) {
         Reflection.ensureNativeAccess(Reflection.getCallerClass());
         Objects.requireNonNull(scope);
         Objects.requireNonNull(target);
         Objects.requireNonNull(function);
         target = SharedUtils.boxVaLists(target, MH_boxVaList);
-        return UpcallStubs.upcallAddress(CallArranger.arrangeUpcall(target, target.type(), function, invMode), (ResourceScopeImpl) scope);
+        return UpcallStubs.upcallAddress(CallArranger.arrangeUpcall(target, target.type(), function, characteristics), (ResourceScopeImpl) scope);
     }
 
     public static VaList newVaListOfAddress(MemoryAddress ma, ResourceScope scope) {

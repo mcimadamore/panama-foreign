@@ -87,7 +87,7 @@ public class ProgrammableUpcallHandler {
         }
     }
 
-    public static UpcallHandler make(ABIDescriptor abi, MethodHandle target, CallingSequence callingSequence, int invMode) {
+    public static UpcallHandler make(ABIDescriptor abi, MethodHandle target, CallingSequence callingSequence, int characteristics) {
         Binding.VMLoad[] argMoves = argMoveBindings(callingSequence);
         Binding.VMStore[] retMoves = retMoveBindings(callingSequence);
 
@@ -104,14 +104,14 @@ public class ProgrammableUpcallHandler {
         MethodHandle doBindings;
         long bufferCopySize = SharedUtils.bufferCopySize(callingSequence);
         if (USE_SPEC && isSimple) {
-            doBindings = specializedBindingHandle(target, callingSequence, llReturn, bufferCopySize, invMode);
+            doBindings = specializedBindingHandle(target, callingSequence, llReturn, bufferCopySize, characteristics);
             assert doBindings.type() == llType;
         } else {
             Map<VMStorage, Integer> argIndices = SharedUtils.indexMap(argMoves);
             Map<VMStorage, Integer> retIndices = SharedUtils.indexMap(retMoves);
             target = target.asSpreader(Object[].class, callingSequence.methodType().parameterCount());
             doBindings = insertArguments(MH_invokeInterpBindings, 1, target, argIndices, retIndices, callingSequence,
-                    bufferCopySize, invMode);
+                    bufferCopySize, characteristics);
             doBindings = doBindings.asCollector(Object[].class, llType.parameterCount());
             doBindings = doBindings.asType(llType);
         }
@@ -161,7 +161,7 @@ public class ProgrammableUpcallHandler {
     }
 
     private static MethodHandle specializedBindingHandle(MethodHandle target, CallingSequence callingSequence,
-                                                         Class<?> llReturn, long bufferCopySize, int invMode) {
+                                                         Class<?> llReturn, long bufferCopySize, int characteristics) {
         MethodType highLevelType = callingSequence.methodType();
 
         MethodHandle specializedHandle = target; // initial
@@ -178,7 +178,7 @@ public class ProgrammableUpcallHandler {
             List<Binding> bindings = callingSequence.argumentBindings(i);
             for (int j = bindings.size() - 1; j >= 0; j--) {
                 Binding binding = bindings.get(j);
-                filter = binding.specialize(filter, filterInsertPos, filterAllocatorPos, invMode);
+                filter = binding.specialize(filter, filterInsertPos, filterAllocatorPos, characteristics);
             }
             specializedHandle = MethodHandles.collectArguments(specializedHandle, argInsertPos, filter);
             specializedHandle = mergeArguments(specializedHandle, argAllocatorPos, argInsertPos + filterAllocatorPos);
@@ -192,13 +192,13 @@ public class ProgrammableUpcallHandler {
             List<Binding> bindings = callingSequence.returnBindings();
             for (int j = bindings.size() - 1; j >= 0; j--) {
                 Binding binding = bindings.get(j);
-                filter = binding.specialize(filter, retInsertPos, retAllocatorPos, invMode);
+                filter = binding.specialize(filter, retInsertPos, retAllocatorPos, characteristics);
             }
             specializedHandle = filterReturnValue(specializedHandle, filter);
         }
 
         specializedHandle = SharedUtils.wrapWithAllocator(specializedHandle, argAllocatorPos, bufferCopySize,
-                true, callingSequence.hasAddressParameters(), invMode);
+                true, callingSequence.hasAddressParameters(), characteristics);
 
         return specializedHandle;
     }
@@ -258,7 +258,7 @@ public class ProgrammableUpcallHandler {
                                                Map<VMStorage, Integer> retIndexMap,
                                                CallingSequence callingSequence,
                                                long bufferCopySize,
-                                               int invMode) throws Throwable {
+                                               int characteristics) throws Throwable {
         Binding.Context allocator = bufferCopySize != 0
                 ? Binding.Context.ofBoundedAllocator(bufferCopySize)
                 : Binding.Context.ofScope();
@@ -267,7 +267,7 @@ public class ProgrammableUpcallHandler {
             Object[] args = new Object[callingSequence.methodType().parameterCount()];
             for (int i = 0; i < args.length; i++) {
                 args[i] = BindingInterpreter.box(callingSequence.argumentBindings(i),
-                        (storage, type) -> moves[argIndexMap.get(storage)], invMode, allocator);
+                        (storage, type) -> moves[argIndexMap.get(storage)], characteristics, allocator);
             }
 
             if (DEBUG) {
@@ -286,7 +286,7 @@ public class ProgrammableUpcallHandler {
             Object[] returnMoves = new Object[retIndexMap.size()];
             if (leaf.type().returnType() != void.class) {
                 BindingInterpreter.unbox(o, callingSequence.returnBindings(),
-                        (storage, type, value) -> returnMoves[retIndexMap.get(storage)] = value, invMode, null);
+                        (storage, type, value) -> returnMoves[retIndexMap.get(storage)] = value, characteristics, null);
             }
 
             if (returnMoves.length == 0) {
