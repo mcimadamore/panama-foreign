@@ -25,6 +25,7 @@
 
 package org.openjdk.bench.jdk.incubator.foreign;
 
+import jdk.incubator.foreign.MemoryLayouts;
 import jdk.incubator.foreign.MemorySegment;
 import jdk.incubator.foreign.ResourceScope;
 import sun.misc.Unsafe;
@@ -45,13 +46,12 @@ import sun.misc.Unsafe;
 
 import jdk.incubator.foreign.MemorySegment;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
-
-import static jdk.incubator.foreign.MemoryLayouts.JAVA_INT;
 
 @BenchmarkMode(Mode.AverageTime)
 @Warmup(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
@@ -63,15 +63,17 @@ public class TestSmallCopy {
     static final Unsafe unsafe = Utils.unsafe;
 
     static final int ELEM_SIZE = 100;
-    static final int CARRIER_SIZE = (int)JAVA_INT.byteSize();
+    static final int CARRIER_SIZE = (int) MemoryLayouts.JAVA_BYTE.byteSize();
     static final int ALLOC_SIZE = ELEM_SIZE * CARRIER_SIZE;
 
     static final long unsafe_addr = unsafe.allocateMemory(ALLOC_SIZE);
     static final MemorySegment segment = MemorySegment.allocateNative(ALLOC_SIZE, ResourceScope.newConfinedScope());
 
-    static final int[] bytes = new int[ELEM_SIZE];
+    static final byte[] bytes = new byte[ALLOC_SIZE];
     static final MemorySegment bytesSegment = MemorySegment.ofArray(bytes);
-    static final int UNSAFE_INT_OFFSET = unsafe.arrayBaseOffset(int[].class);
+    static final int UNSAFE_BYTE_OFFSET = unsafe.arrayBaseOffset(byte[].class);
+
+    static final ByteBuffer buffer = ByteBuffer.allocateDirect(ALLOC_SIZE).order(ByteOrder.nativeOrder());
 
     int srcOffset;
     int targetOffset;
@@ -81,7 +83,7 @@ public class TestSmallCopy {
 
     static {
         for (int i = 0 ; i < bytes.length ; i++) {
-            bytes[i] = i;
+            bytes[i] = (byte)i;
         }
     }
 
@@ -89,42 +91,30 @@ public class TestSmallCopy {
     public void setup() {
         srcOffset = random.nextInt(ELEM_SIZE / 4);
         targetOffset = random.nextInt(ELEM_SIZE / 4);
-        nbytes = ELEM_SIZE / 4 + random.nextInt(ELEM_SIZE / 4);
+        nbytes = ELEM_SIZE / 2;
     }
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public void unsafe_small_copy() {
-        unsafe.copyMemory(bytes, UNSAFE_INT_OFFSET + srcOffset, null, unsafe_addr + targetOffset, nbytes);
+        unsafe.copyMemory(bytes, UNSAFE_BYTE_OFFSET + srcOffset, null, unsafe_addr + targetOffset, nbytes);
     }
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public void unsafe_small_copy_address() {
-        unsafe.copyMemory(bytes, UNSAFE_INT_OFFSET + srcOffset, null, segment.address().toRawLongValue() + targetOffset, nbytes);
-    }
-
-    @Benchmark
-    @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public void segment_small_copy() {
+    public void segment_small_copy_slice() {
         segment.asSlice(srcOffset, nbytes).copyFrom(bytesSegment.asSlice(targetOffset, nbytes));
+    }
+
+    @Benchmark
+    @OutputTimeUnit(TimeUnit.NANOSECONDS)
+    public void buffer_small_copy() {
+        buffer.put(targetOffset, bytes, srcOffset, nbytes);
     }
 
     @Benchmark
     @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public void segment_small_copy_static() {
         MemorySegment.copy(bytesSegment, srcOffset, segment, targetOffset, nbytes);
-    }
-
-    @Benchmark
-    @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public void segment_small_copy_fresh() {
-        segment.asSlice(srcOffset, nbytes).copyFrom(MemorySegment.ofArray(bytes).asSlice(targetOffset, nbytes));
-    }
-
-    @Benchmark
-    @OutputTimeUnit(TimeUnit.NANOSECONDS)
-    public void segment_small_copy_fresh_reverse() {
-        MemorySegment.ofArray(bytes).asSlice(srcOffset, nbytes).copyFrom(segment.asSlice(targetOffset, nbytes));
     }
 }
