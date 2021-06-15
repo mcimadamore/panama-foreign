@@ -818,4 +818,8 @@ for (long l = 0; l < segment.byteSize(); l++) {
         Reflection.ensureNativeAccess(Reflection.getCallerClass());
         return NativeMemorySegmentImpl.EVERYTHING;
     }
+
+    public static void copy(MemorySegment srcSegment, long srcOffset, MemorySegment dstSegment, long dstOffset, long nbytes) {
+        AbstractMemorySegmentImpl.copy(srcSegment, srcOffset, dstSegment, dstOffset, nbytes);
+    }
 }

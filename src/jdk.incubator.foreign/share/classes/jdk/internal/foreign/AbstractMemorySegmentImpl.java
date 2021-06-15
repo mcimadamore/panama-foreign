@@ -538,4 +538,15 @@ public abstract non-sealed class AbstractMemorySegmentImpl extends MemorySegment
             return new MappedMemorySegmentImpl(bbAddress + pos, unmapper, size, modes, bufferScope);
         }
     }
+
+    @ForceInline
+    public static void copy(MemorySegment srcSegment, long srcOffset, MemorySegment dstSegment, long dstOffset, long nbytes) {
+        AbstractMemorySegmentImpl src = (AbstractMemorySegmentImpl)Objects.requireNonNull(srcSegment);
+        AbstractMemorySegmentImpl dest = (AbstractMemorySegmentImpl)Objects.requireNonNull(dstSegment);
+        src.checkAccess(srcOffset, nbytes, true);
+        dest.checkAccess(dstOffset, nbytes, false);
+        SCOPED_MEMORY_ACCESS.copyMemory(src.scope, dest.scope,
+                src.base(), src.min() + srcOffset,
+                dest.base(), dest.min() + dstOffset, nbytes);
+    }
 }
