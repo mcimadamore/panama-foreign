@@ -41,6 +41,7 @@ import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import sun.misc.Unsafe;
 
@@ -65,33 +66,36 @@ public class TestSmallCopy {
     static final int ELEM_SIZE = 100;
     static final int CARRIER_SIZE = (int) MemoryLayouts.JAVA_BYTE.byteSize();
     static final int ALLOC_SIZE = ELEM_SIZE * CARRIER_SIZE;
-
-    static final long unsafe_addr = unsafe.allocateMemory(ALLOC_SIZE);
-    static final MemorySegment segment = MemorySegment.allocateNative(ALLOC_SIZE, ResourceScope.newConfinedScope());
-
-    static final byte[] bytes = new byte[ALLOC_SIZE];
-    static final MemorySegment bytesSegment = MemorySegment.ofArray(bytes);
     static final int UNSAFE_BYTE_OFFSET = unsafe.arrayBaseOffset(byte[].class);
 
-    static final ByteBuffer buffer = ByteBuffer.allocateDirect(ALLOC_SIZE).order(ByteOrder.nativeOrder());
+    final long unsafe_addr = unsafe.allocateMemory(ALLOC_SIZE);
+    final MemorySegment segment = MemorySegment.allocateNative(ALLOC_SIZE, ResourceScope.newConfinedScope());
+    final ByteBuffer buffer = ByteBuffer.allocateDirect(ALLOC_SIZE).order(ByteOrder.nativeOrder());
+
+    final byte[] bytes = new byte[ALLOC_SIZE];
+    final MemorySegment bytesSegment = MemorySegment.ofArray(bytes);
 
     int srcOffset;
     int targetOffset;
     int nbytes;
 
-    static final Random random = new Random();
+    final Random random = new Random();
 
-    static {
+    @Setup
+    public void setup() {
+        srcOffset = random.nextInt(ELEM_SIZE / 4);
+        targetOffset = random.nextInt(ELEM_SIZE / 4);
+        nbytes = ELEM_SIZE / 2;
         for (int i = 0 ; i < bytes.length ; i++) {
             bytes[i] = (byte)i;
         }
     }
 
-    @Setup//(Level.Iteration)
-    public void setup() {
-        srcOffset = random.nextInt(ELEM_SIZE / 4);
-        targetOffset = random.nextInt(ELEM_SIZE / 4);
-        nbytes = ELEM_SIZE / 2;
+    @TearDown
+    public void tearDown() {
+        segment.scope().close();
+        unsafe.invokeCleaner(buffer);
+        unsafe.freeMemory(unsafe_addr);
     }
 
     @Benchmark
