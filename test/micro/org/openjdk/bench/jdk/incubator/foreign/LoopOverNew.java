@@ -81,12 +81,24 @@ public class LoopOverNew {
     }
 
     @Benchmark
-    public void segment_loop_confined() {
+    public void segment_loop_confined_set() {
         try (ResourceScope scope = ResourceScope.newConfinedScope()) {
             MemorySegment segment = MemorySegment.allocateNative(ALLOC_SIZE, 4, scope);
             for (int i = 0; i < ELEM_SIZE; i++) {
                 VH_int.set(segment, (long) i, i);
             }
+        }
+    }
+
+    @Benchmark
+    public int segment_loop_confined_get() {
+        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+            MemorySegment segment = MemorySegment.allocateNative(ALLOC_SIZE, 4, scope);
+            int res = 0;
+            for (int i = 0; i < ELEM_SIZE; i++) {
+                res += (int)VH_int.get(segment, (long) i);
+            }
+            return res;
         }
     }
 

@@ -108,7 +108,7 @@ public class NativeMemorySegmentImpl extends AbstractMemorySegmentImpl {
         }
         long alignedBuf = Utils.alignUp(buf, alignmentBytes);
         AbstractMemorySegmentImpl segment = new NativeMemorySegmentImpl(buf, alignedSize,
-                defaultAccessModes(alignedSize), scope);
+                DEFAULT_MODES, scope);
         scope.addOrCleanupIfFail(new ResourceScopeImpl.ResourceList.ResourceCleanup() {
             @Override
             public void cleanup() {
@@ -125,7 +125,7 @@ public class NativeMemorySegmentImpl extends AbstractMemorySegmentImpl {
 
     public static MemorySegment makeNativeSegmentUnchecked(MemoryAddress min, long bytesSize, Runnable cleanupAction, ResourceScopeImpl scope) {
         scope.checkValidStateSlow();
-        AbstractMemorySegmentImpl segment = new NativeMemorySegmentImpl(min.toRawLongValue(), bytesSize, defaultAccessModes(bytesSize), scope);
+        AbstractMemorySegmentImpl segment = new NativeMemorySegmentImpl(min.toRawLongValue(), bytesSize, DEFAULT_MODES, scope);
         if (cleanupAction != null) {
             scope.addCloseAction(cleanupAction);
         }

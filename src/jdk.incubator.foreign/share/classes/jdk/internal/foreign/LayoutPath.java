@@ -355,7 +355,6 @@ public class LayoutPath {
     }
 
     private static long addStride(MemorySegment segment, long stride, long base, long index) {
-        return MemorySegmentProxy.addOffsets(base,
-                    MemorySegmentProxy.multiplyOffsets(stride, index, ((MemorySegmentProxy)segment)), (MemorySegmentProxy)segment);
+        return base + (stride * index);
     }
 }

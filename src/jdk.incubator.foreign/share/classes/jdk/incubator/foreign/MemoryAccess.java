@@ -1455,6 +1455,6 @@ public final class MemoryAccess {
 
     @ForceInline
     private static long scale(MemorySegment address, long index, int size) {
-        return MemorySegmentProxy.multiplyOffsets(index, size, (MemorySegmentProxy)address);
+        return index * size;
     }
 }
