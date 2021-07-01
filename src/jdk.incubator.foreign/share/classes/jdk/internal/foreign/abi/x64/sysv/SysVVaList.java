@@ -26,10 +26,16 @@
 package jdk.internal.foreign.abi.x64.sysv;
 
 import jdk.incubator.foreign.*;
+import jdk.internal.foreign.ResourceScopeImpl;
 import jdk.internal.foreign.Utils;
 import jdk.internal.foreign.abi.SharedUtils;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.annotation.ForceInline;
+import jdk.internal.vm.annotation.Stable;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.ref.Cleaner;
 import java.nio.ByteOrder;
@@ -316,7 +322,7 @@ public non-sealed class SysVVaList implements VaList {
     @Override
     public VaList copy() {
         MemorySegment copy = MemorySegment.allocateNative(LAYOUT, segment.scope());
-        copy.copyFrom(segment);
+        copy.copyFrom(segment.asSlice(0, LAYOUT.byteSize()));
         return new SysVVaList(copy, regSaveArea);
     }
 
@@ -342,14 +348,14 @@ public non-sealed class SysVVaList implements VaList {
 
     public static non-sealed class Builder implements VaList.Builder {
         private final ResourceScope scope;
-        private final MemorySegment reg_save_area;
-        private long currentGPOffset = 0;
-        private long currentFPOffset = FP_OFFSET;
-        private final List<SimpleVaArg> stackArgs = new ArrayList<>();
+        private final List<Class<?>> carriers = new ArrayList<>();
+        private final List<MemoryLayout> layouts = new ArrayList<>();
+        private final List<Object> values = new ArrayList<>();
 
         public Builder(ResourceScope scope) {
             this.scope = scope;
-            this.reg_save_area = MemorySegment.allocateNative(LAYOUT_REG_SAVE_AREA, scope);
+            values.add(SegmentAllocator.ofScope(scope));
+            ((ResourceScopeImpl)scope).checkValidState();
         }
 
         @Override
@@ -378,85 +384,252 @@ public non-sealed class SysVVaList implements VaList {
         }
 
         private Builder arg(Class<?> carrier, MemoryLayout layout, Object value) {
+            Objects.requireNonNull(carrier);
             Objects.requireNonNull(layout);
             Objects.requireNonNull(value);
+            carriers.add(carrier);
+            layouts.add(layout);
+            values.add(value);
+            return this;
+        }
+
+        public VaList build() {
+            try {
+                return (VaList) builder(carriers, layouts).invokeWithArguments(values);
+            } catch (Throwable ex) {
+                throw new IllegalStateException(ex);
+            }
+        }
+    }
+
+
+    public static class BuilderHandle {
+        private long currentGPOffset = 0;
+        private long currentFPOffset = FP_OFFSET;
+        MethodHandle argFilter;
+        private long stackArgsSize = 0L;
+
+        private final static long STACK_OFFSET = Utils.alignUp(LAYOUT.byteSize() + LAYOUT_REG_SAVE_AREA.byteSize(), 16);
+
+        public BuilderHandle(List<Class<?>> carriers, List<MemoryLayout> layouts) {
+            Objects.requireNonNull(carriers);
+            Objects.requireNonNull(layouts);
+            if (carriers.size() != layouts.size()) {
+                throw new IllegalArgumentException("carrier and layout size mismatch");
+            }
+            for (int i = 0 ; i < carriers.size() ; i++) {
+                classifyArg(carriers.get(i), layouts.get(i));
+            }
+        }
+
+        private void combine(MethodHandle handle) {
+            if (argFilter == null) {
+                argFilter = handle;
+            } else {
+                argFilter = MethodHandles.collectArguments(handle, 0, argFilter);
+            }
+        }
+
+        long overflowOffset(long offset) {
+            return STACK_OFFSET + offset;
+        }
+
+        long gpOffset() {
+            return LAYOUT.byteSize() + currentGPOffset;
+        }
+
+        long fpOffset() {
+            return LAYOUT.byteSize() + currentFPOffset;
+        }
+
+        private void classifyArg(Class<?> carrier, MemoryLayout layout) {
+            Objects.requireNonNull(carrier);
+            Objects.requireNonNull(layout);
             checkCompatibleType(carrier, layout, SysVx64Linker.ADDRESS_SIZE);
             TypeClass typeClass = TypeClass.classifyLayout(layout);
             if (isRegOverflow(currentGPOffset, currentFPOffset, typeClass)
                     || typeClass.inMemory()) {
                 // stack it!
-                stackArgs.add(new SimpleVaArg(carrier, layout, value));
+                if (layout.byteSize() > 8) {
+                    stackArgsSize = Utils.alignUp(stackArgsSize, Math.min(16, layout.byteSize()));
+                }
+                combine(carrier == MemorySegment.class ?
+                        new StackStructDescriptor(carrier, layout, overflowOffset(stackArgsSize)).evalHandle() :
+                        new DirectDescriptor(carrier, layout, overflowOffset(stackArgsSize)).evalHandle());
+                stackArgsSize += layout.byteSize();
             } else {
                 switch (typeClass.kind()) {
                     case STRUCT -> {
-                        MemorySegment valueSegment = (MemorySegment) value;
                         int classIdx = 0;
                         long offset = 0;
+                        List<Long> offsets = new ArrayList<>();
                         while (offset < layout.byteSize()) {
                             final long copy = Math.min(layout.byteSize() - offset, 8);
                             boolean isSSE = typeClass.classes.get(classIdx++) == ArgumentClassImpl.SSE;
-                            MemorySegment slice = valueSegment.asSlice(offset, copy);
                             if (isSSE) {
-                                reg_save_area.asSlice(currentFPOffset, copy).copyFrom(slice);
+                                offsets.add(fpOffset());
                                 currentFPOffset += FP_SLOT_SIZE;
                             } else {
-                                reg_save_area.asSlice(currentGPOffset, copy).copyFrom(slice);
+                                offsets.add(gpOffset());
                                 currentGPOffset += GP_SLOT_SIZE;
                             }
                             offset += copy;
                         }
+                        combine(new StructDescriptor(carrier, layout, offsets.stream().mapToLong(v -> v).toArray()).evalHandle());
                     }
                     case POINTER, INTEGER -> {
-                        VarHandle writer = SharedUtils.vhPrimitiveOrAddress(carrier, layout);
-                        writer.set(reg_save_area.asSlice(currentGPOffset), value);
+                        combine(new DirectDescriptor(carrier, layout, gpOffset()).evalHandle());
                         currentGPOffset += GP_SLOT_SIZE;
                     }
                     case FLOAT -> {
-                        VarHandle writer = layout.varHandle(carrier);
-                        writer.set(reg_save_area.asSlice(currentFPOffset), value);
+                        combine(new DirectDescriptor(carrier, layout, fpOffset()).evalHandle());
                         currentFPOffset += FP_SLOT_SIZE;
                     }
                 }
             }
-            return this;
         }
 
-        private boolean isEmpty() {
-            return currentGPOffset == 0 && currentFPOffset == FP_OFFSET && stackArgs.isEmpty();
-        }
+        public static abstract class ArgDescriptor {
+            public final Class<?> carrier;
+            public final MemoryLayout layout;
 
-        public VaList build() {
-            if (isEmpty()) {
-                return EMPTY;
+            public ArgDescriptor(Class<?> carrier, MemoryLayout layout) {
+                this.carrier = carrier;
+                this.layout = layout;
             }
 
-            SegmentAllocator allocator = SegmentAllocator.arenaAllocator(scope);
-            MemorySegment vaListSegment = allocator.allocate(LAYOUT);
-            MemoryAddress stackArgsPtr = MemoryAddress.NULL;
-            if (!stackArgs.isEmpty()) {
-                long stackArgsSize = stackArgs.stream().reduce(0L, (acc, e) -> acc + e.layout.byteSize(), Long::sum);
-                MemorySegment stackArgsSegment = allocator.allocate(stackArgsSize, 16);
-                MemorySegment maOverflowArgArea = stackArgsSegment;
-                for (SimpleVaArg arg : stackArgs) {
-                    if (arg.layout.byteSize() > 8) {
-                        maOverflowArgArea = Utils.alignUp(maOverflowArgArea, Math.min(16, arg.layout.byteSize()));
-                    }
-                    if (arg.value instanceof MemorySegment) {
-                        maOverflowArgArea.copyFrom((MemorySegment) arg.value);
-                    } else {
-                        VarHandle writer = arg.varHandle();
-                        writer.set(maOverflowArgArea, arg.value);
-                    }
-                    maOverflowArgArea = maOverflowArgArea.asSlice(arg.layout.byteSize());
+            abstract MethodHandle evalHandle();
+        }
+
+        public static class DirectDescriptor extends ArgDescriptor {
+            final long offset;
+
+            static final MethodHandle VALIST_SEGMENT_MH;
+
+            static {
+                try {
+                    VALIST_SEGMENT_MH = MethodHandles.lookup().findGetter(SysVVaList.class, "segment", MemorySegment.class);
+                } catch (Throwable ex) {
+                    throw new ExceptionInInitializerError(ex);
                 }
-                stackArgsPtr = stackArgsSegment.address();
             }
+
+            public DirectDescriptor(Class<?> carrier, MemoryLayout layout, long offset) {
+                super(carrier, layout);
+                this.offset = offset;
+            }
+
+            @Override
+            MethodHandle evalHandle() {
+                VarHandle varHandle = MemoryHandles.varHandle(carrier == MemoryAddress.class ? long.class : carrier, 1, ((ValueLayout)layout).order());
+                if (carrier == MemoryAddress.class) {
+                    varHandle = MemoryHandles.asAddressVarHandle(varHandle);
+                }
+                MethodHandle handle = MethodHandles.identity(SysVVaList.class);
+                MethodHandle setter = varHandle.toMethodHandle(VarHandle.AccessMode.SET);
+                setter = MethodHandles.insertArguments(setter, 1, offset);
+                setter = MethodHandles.filterArguments(setter, 0, VALIST_SEGMENT_MH);
+                handle = MethodHandles.collectArguments(handle, 0, setter);
+                handle = SharedUtils.mergeArguments(handle, 0, 2);
+                return handle;
+            }
+        }
+
+        public abstract static class IndirectDescriptor extends ArgDescriptor {
+
+            public IndirectDescriptor(Class<?> carrier, MemoryLayout layout) {
+                super(carrier, layout);
+            }
+
+            abstract SysVVaList eval(SysVVaList valist, Object arg);
+
+            @Override
+            MethodHandle evalHandle() {
+                try {
+                    MethodHandle handle = MethodHandles.lookup().findVirtual(getClass(), "eval", MethodType.methodType(SysVVaList.class, SysVVaList.class, Object.class)).bindTo(this);
+                    return handle.asType(handle.type().changeParameterType(1, carrier));
+                } catch (Throwable ex) {
+                    throw new AssertionError(ex);
+                }
+            }
+        }
+
+        public static class StackStructDescriptor extends IndirectDescriptor {
+
+            final long offset;
+
+            public StackStructDescriptor(Class<?> carrier, MemoryLayout layout, long offset) {
+                super(carrier, layout);
+                this.offset = offset;
+            }
+
+            @ForceInline
+            SysVVaList eval(SysVVaList valist, Object arg) {
+                valist.segment.asSlice(offset, layout.byteSize()).copyFrom((MemorySegment)arg);
+                return valist;
+            }
+        }
+
+        public static class StructDescriptor extends IndirectDescriptor {
+
+            @Stable
+            final long[] offsets;
+
+            public StructDescriptor(Class<?> carrier, MemoryLayout layout, long[] offsets) {
+                super(carrier, layout);
+                this.offsets = offsets;
+            }
+
+            @Override
+            SysVVaList eval(SysVVaList valist, Object arg) {
+                MemorySegment valueSegment = (MemorySegment) arg;
+                long offset = 0;
+                for (long regOffset : offsets) {
+                    final long copy = Math.min(layout.byteSize() - offset, 8);
+                    MemorySegment slice = valueSegment.asSlice(offset, copy);
+                    valist.segment.asSlice(regOffset, copy).copyFrom(slice);
+                    offset += copy;
+                }
+                return valist;
+            }
+        }
+
+        @ForceInline
+        public SysVVaList build(SegmentAllocator allocator) throws Throwable {
+            // VALIST | REG_SAVE_AREA | OVERFLOW_AREA
+            MemorySegment vaListSegment = allocator.allocate(STACK_OFFSET + stackArgsSize);
+            MemorySegment reg_save_area = vaListSegment.asSlice(LAYOUT.byteSize());
+
+            MemoryAddress stackPtr = stackArgsSize > 0 ?
+                    vaListSegment.address().addOffset(STACK_OFFSET) :
+                    MemoryAddress.NULL;
 
             VH_fp_offset.set(vaListSegment, (int) FP_OFFSET);
-            VH_overflow_arg_area.set(vaListSegment, stackArgsPtr);
+            VH_overflow_arg_area.set(vaListSegment, stackPtr);
             VH_reg_save_area.set(vaListSegment, reg_save_area.address());
             assert reg_save_area.scope().ownerThread() == vaListSegment.scope().ownerThread();
             return new SysVVaList(vaListSegment, reg_save_area);
+        }
+    }
+
+    final static MethodHandle BUILD_MH;
+
+    static {
+        try {
+            BUILD_MH = MethodHandles.lookup().findVirtual(BuilderHandle.class, "build", MethodType.methodType(SysVVaList.class, SegmentAllocator.class));
+        } catch (Throwable ex) {
+            throw new ExceptionInInitializerError(ex);
+        }
+    }
+
+    public static MethodHandle builder(List<Class<?>> carriers, List<MemoryLayout> layouts) {
+        BuilderHandle builder = new BuilderHandle(carriers, layouts);
+        if (builder.argFilter == null) {
+            MethodHandle handle = MethodHandles.constant(VaList.class, EMPTY);
+            return MethodHandles.dropArguments(handle, 0, SegmentAllocator.class);
+        } else {
+            MethodHandle handle = MethodHandles.filterArguments(builder.argFilter, 0, BUILD_MH.bindTo(builder));
+            return handle.asType(handle.type().changeReturnType(VaList.class));
         }
     }
 }

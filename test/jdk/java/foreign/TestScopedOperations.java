@@ -118,7 +118,7 @@ public class TestScopedOperations {
             }
         }, "MemorySegment::mapFromFile");
         ScopedOperation.ofScope(scope -> CLinker.VaList.make(b -> {}, scope), "VaList::make");
-        ScopedOperation.ofScope(scope -> CLinker.VaList.ofAddress(MemoryAddress.ofLong(42), scope), "VaList::make");
+        ScopedOperation.ofScope(scope -> CLinker.VaList.ofAddress(MemoryAddress.ofLong(42), scope), "VaList::ofAddress");
         ScopedOperation.ofScope(scope -> CLinker.toCString("Hello", scope), "CLinker::toCString");
         ScopedOperation.ofScope(SegmentAllocator::arenaAllocator, "SegmentAllocator::arenaAllocator");
         // segment operations

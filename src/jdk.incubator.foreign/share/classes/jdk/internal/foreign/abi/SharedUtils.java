@@ -45,6 +45,7 @@ import jdk.internal.foreign.MemoryAddressImpl;
 import jdk.internal.foreign.Utils;
 import jdk.internal.foreign.abi.aarch64.linux.LinuxAArch64Linker;
 import jdk.internal.foreign.abi.aarch64.macos.MacOsAArch64Linker;
+import jdk.internal.foreign.abi.x64.sysv.SysVVaList;
 import jdk.internal.foreign.abi.x64.sysv.SysVx64Linker;
 import jdk.internal.foreign.abi.x64.windows.Windowsx64Linker;
 
@@ -332,7 +333,7 @@ public class SharedUtils {
                         .collect(Collectors.toMap(i -> moves[i].storage(), i -> i));
     }
 
-    static MethodHandle mergeArguments(MethodHandle mh, int sourceIndex, int destIndex) {
+    public static MethodHandle mergeArguments(MethodHandle mh, int sourceIndex, int destIndex) {
         MethodType oldType = mh.type();
         Class<?> sourceType = oldType.parameterType(sourceIndex);
         Class<?> destType = oldType.parameterType(destIndex);
@@ -519,6 +520,13 @@ public class SharedUtils {
             case SysV -> SysVx64Linker.emptyVaList();
             case LinuxAArch64 -> LinuxAArch64Linker.emptyVaList();
             case MacOsAArch64 -> MacOsAArch64Linker.emptyVaList();
+        };
+    }
+
+    public static MethodHandle vaListBuilder(List<Class<?>> carriers, List<MemoryLayout> layouts) {
+        return switch (CABI.current()) {
+            case SysV -> SysVVaList.builder(carriers, layouts);
+            default -> throw new UnsupportedOperationException("ABI not supported");
         };
     }
 

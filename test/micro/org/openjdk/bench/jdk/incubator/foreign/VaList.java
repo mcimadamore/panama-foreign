@@ -24,6 +24,8 @@ package org.openjdk.bench.jdk.incubator.foreign;
 
 import jdk.incubator.foreign.FunctionDescriptor;
 import jdk.incubator.foreign.CLinker;
+import jdk.incubator.foreign.MemorySegment;
+import jdk.incubator.foreign.SegmentAllocator;
 import jdk.incubator.foreign.SymbolLookup;
 import jdk.incubator.foreign.ResourceScope;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -37,6 +39,7 @@ import org.openjdk.jmh.annotations.Warmup;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static jdk.incubator.foreign.CLinker.C_DOUBLE;
@@ -87,5 +90,45 @@ public class VaList {
             MH_vaList.invokeExact(3,
                     vaList);
         }
+    }
+
+    final static MethodHandle VA_LIST_I_D_LL = CLinker.VaList.builder(
+            List.of(int.class, double.class, long.class),
+            List.of(C_INT, C_DOUBLE, C_LONG_LONG)
+    );
+
+    @Benchmark
+    public void vaList_MH_3() throws Throwable {
+        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+            MH_vaList.invokeExact(3,
+                    (CLinker.VaList)VA_LIST_I_D_LL.invokeExact(SegmentAllocator.ofScope(scope), 1, 2D, 3L));
+        }
+    }
+
+    @Benchmark
+    public void vaList_MH_3_recycle() throws Throwable {
+        MH_vaList.invokeExact(3,
+                (CLinker.VaList)VA_LIST_I_D_LL.invokeExact(SegmentAllocator.ofSegment(segment), 1, 2D, 3L));
+    }
+
+    final static MethodHandle VA_LIST_I = CLinker.VaList.builder(
+            List.of(int.class),
+            List.of(C_INT)
+    );
+
+    @Benchmark
+    public void vaList_MH_1() throws Throwable {
+        try (ResourceScope scope = ResourceScope.newConfinedScope()) {
+            MH_vaList.invokeExact(3,
+                    (CLinker.VaList)VA_LIST_I.invokeExact(SegmentAllocator.ofScope(scope), 1));
+        }
+    }
+
+    MemorySegment segment = MemorySegment.allocateNative(1024, ResourceScope.newImplicitScope());
+
+    @Benchmark
+    public void vaList_MH_1_recycle() throws Throwable {
+        MH_vaList.invokeExact(3,
+                (CLinker.VaList)VA_LIST_I.invokeExact(SegmentAllocator.ofSegment(segment), 1));
     }
 }

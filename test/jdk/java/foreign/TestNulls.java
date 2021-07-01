@@ -106,7 +106,9 @@ public class TestNulls {
             "jdk.incubator.foreign.ValueLayout/withAttribute(java.lang.String,java.lang.constant.Constable)/1/0",
             "jdk.incubator.foreign.GroupLayout/withAttribute(java.lang.String,java.lang.constant.Constable)/1/0",
             "jdk.incubator.foreign.MemoryHandles/insertCoordinates(java.lang.invoke.VarHandle,int,java.lang.Object[])/2/1",
-            "jdk.incubator.foreign.FunctionDescriptor/withAttribute(java.lang.String,java.lang.constant.Constable)/1/0"
+            "jdk.incubator.foreign.FunctionDescriptor/withAttribute(java.lang.String,java.lang.constant.Constable)/1/0",
+            "jdk.incubator.foreign.CLinker$VaList/builder(java.util.List,java.util.List)/0/1",
+            "jdk.incubator.foreign.CLinker$VaList/builder(java.util.List,java.util.List)/1/1"
     );
 
     static final Set<String> OBJECT_METHODS = Stream.of(Object.class.getMethods())

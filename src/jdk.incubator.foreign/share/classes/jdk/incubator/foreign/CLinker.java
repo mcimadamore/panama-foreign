@@ -42,6 +42,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -642,6 +643,17 @@ public sealed interface CLinker permits AbstractCLinker {
          */
         static VaList empty() {
             return SharedUtils.emptyVaList();
+        }
+
+        /**
+         * Obtain a method handle that can be used to construct a C {@code va_list}. The returned handle
+         * accepts argument of arity and types specified by the {@code carriers} parameter.
+         * @param carriers the Java types describing the values to be stored in the new {@link VaList} instance.
+         * @param layouts the memory layouts of the native values in the C {@code va_list}.
+         * @return a method handle factory which can be used to construct a new C {@code va_list}.
+         */
+        static MethodHandle builder(List<Class<?>> carriers, List<MemoryLayout> layouts) {
+            return SharedUtils.vaListBuilder(carriers, layouts);
         }
 
         /**
