@@ -525,7 +525,7 @@ public class SharedUtils {
 
     public static MethodHandle vaListBuilder(List<Class<?>> carriers, List<MemoryLayout> layouts) {
         return switch (CABI.current()) {
-            case SysV -> SysVVaList.builder(carriers, layouts);
+            case SysV -> SysVVaList.BuilderHandle.builder(carriers, layouts);
             default -> throw new UnsupportedOperationException("ABI not supported");
         };
     }
