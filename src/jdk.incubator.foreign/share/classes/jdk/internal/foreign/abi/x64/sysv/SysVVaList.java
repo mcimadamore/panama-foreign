@@ -581,6 +581,7 @@ public non-sealed class SysVVaList implements VaList {
             }
 
             @Override
+            @ForceInline
             SysVVaList eval(SysVVaList valist, Object arg) {
                 MemorySegment valueSegment = (MemorySegment) arg;
                 long offset = 0;
